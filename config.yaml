@@ -1,0 +1,28 @@
+# Database Configuration
+postgres:
+  host: ${POSTGRES_HOST:-localhost}
+  port: ${POSTGRES_PORT:-5432}
+  user: ${POSTGRES_USER:-ridehail_user}
+  password: ${POSTGRES_PASSWORD:-ridehail_pass}
+  database: ${POSTGRES_DATABASE:-ridehail_db}
+
+# RabbitMQ Configuration
+rabbitmq:
+  host: ${RABBITMQ_HOST:-localhost}
+  port: ${RABBITMQ_PORT:-5672}
+  user: ${RABBITMQ_USER:-guest}
+  password: ${RABBITMQ_PASSWORD:-guest}
+
+# WebSocket Configuration
+websocket:
+  port: ${WS_PORT:-8080}
+
+# Service Ports
+services:
+  ride_service: ${RIDE_SERVICE_PORT:-3000}
+  driver_location_service: ${DRIVER_LOCATION_SERVICE_PORT:-3001}
+  admin_service: ${ADMIN_SERVICE_PORT:-3004}
+
+jwt:
+  secret: "V9muwjpb7rRfuAH0fNg+8g80/42v0kT7f7W67cabf3uCpMXATsE0Gzg/3GJtultt"
+  expire_hours: 2
