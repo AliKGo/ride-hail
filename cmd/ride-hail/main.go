@@ -1,9 +1,11 @@
 package ride_hail
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"ride-hail/config"
+	"ride-hail/internal/app"
 )
 
 var (
@@ -13,11 +15,18 @@ var (
 
 func Run() {
 	flag.Parse()
-
 	cfg, err := config.New(*modeConfigPAth, *modeFlag)
 	if err != nil {
 		slog.Error("error in parsing config", err)
 		return
 	}
 
+	ctx, _ := context.WithCancel(context.Background())
+	app, err := app.New(ctx, *cfg)
+	if err != nil {
+		slog.Error("error in creating app", err)
+		//cansel()
+		return
+	}
+	app.Start()
 }

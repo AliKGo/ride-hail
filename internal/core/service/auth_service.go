@@ -6,6 +6,7 @@ import (
 	"ride-hail/config"
 	"ride-hail/internal/core/domain/action"
 	"ride-hail/internal/core/domain/models"
+	"ride-hail/internal/core/domain/types"
 	"ride-hail/internal/core/ports"
 	"ride-hail/internal/core/service/hash"
 	"ride-hail/pkg/logger"
@@ -16,20 +17,22 @@ type AuthService struct {
 	secretKey string
 	cfg       config.Config
 	repo      ports.UserRepository
-	log       logger.Logger
+	log       *logger.Logger
 }
 
-func NewAuthService(key string, cfg config.Config, repo ports.UserRepository, log logger.Logger) *AuthService {
+func NewAuthService(cfg config.Config, repo ports.UserRepository, log *logger.Logger) *AuthService {
 	return &AuthService{
-		secretKey: key,
+		secretKey: cfg.JWT.Secret,
 		repo:      repo,
 		log:       log,
 		cfg:       cfg,
 	}
 }
 
-// returning token and error
+// Login returning token and error
 func (s *AuthService) Login(ctx context.Context, reqId string, user models.User) (string, error) {
+	log := s.log.Func("Login")
+
 	u, err := s.repo.GetGyUserEmail(ctx, reqId, user.Email)
 	if err != nil {
 		return "", err
@@ -37,13 +40,24 @@ func (s *AuthService) Login(ctx context.Context, reqId string, user models.User)
 
 	ok, err := hash.VerifyPassword(u.Password, user.Password)
 	if err != nil {
-		s.log.Error(action.Login, "error in varify password", reqId, "", err)
+		log.Error(
+			action.Login,
+			"error verifying password",
+			"requestID", reqId,
+			"userID", u.ID,
+			"error", err,
+		)
 		return "", err
 	}
 	if !ok {
-		return "", models.ErrIncorrectPassword
+		log.Warn(
+			action.Login,
+			"incorrect password",
+			"requestID", reqId,
+		)
+		return "", types.ErrIncorrectPassword
 	}
-
+  
 	claims := models.Claims{
 		UserID: u.ID,
 		Role:   u.Role,
@@ -57,7 +71,12 @@ func (s *AuthService) Login(ctx context.Context, reqId string, user models.User)
 
 	tokenString, err := token.SignedString([]byte(s.secretKey))
 	if err != nil {
-		s.log.Error(action.Login, "error in generate token", reqId, "", err)
+		log.Error(
+			action.Login,
+			"error generating JWT token",
+			"requestID", reqId,
+			"error", err,
+		)
 		return "", err
 	}
 
@@ -65,12 +84,23 @@ func (s *AuthService) Login(ctx context.Context, reqId string, user models.User)
 }
 
 func (s *AuthService) CreateNewUser(ctx context.Context, reqId string, user models.User) error {
+	log := s.log.Func("CreateNewUser")
+
 	hashPass, err := hash.HashPassword(user.Password)
 	if err != nil {
-		s.log.Error(action.Login, "error in hash password", reqId, "", err)
+		log.Error(
+			action.Registration,
+			"error hashing password",
+			"requestID", reqId,
+			"error", err,
+		)
 		return err
 	}
 
 	user.Password = hashPass
-	return s.repo.CreateNewUser(ctx, reqId, user)
+	err = s.repo.CreateNewUser(ctx, reqId, user)
+	if err != nil {
+		return err
+	}
+	return nil
 }

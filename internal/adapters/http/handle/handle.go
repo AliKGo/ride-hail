@@ -3,26 +3,24 @@ package handle
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"ride-hail/config"
 	"ride-hail/internal/adapters/http/handle/dto"
 	"ride-hail/internal/core/domain/action"
 	"ride-hail/internal/core/domain/models"
+	"ride-hail/internal/core/domain/types"
 	"ride-hail/internal/core/ports"
 	"ride-hail/pkg/logger"
 )
 
-type ctxKey string
-
-const reqIDKey ctxKey = "reqID"
-
 type Handle struct {
 	svc ports.AuthService
-	log logger.Logger
+	log *logger.Logger
 	cfg config.Config
 }
 
-func New(cfg config.Config, svc ports.AuthService, log logger.Logger) *Handle {
+func New(cfg config.Config, svc ports.AuthService, log *logger.Logger) *Handle {
 	return &Handle{
 		svc: svc,
 		log: log,
@@ -35,54 +33,103 @@ var (
 )
 
 func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
+	log := h.log.Func("Registration")
 	ctx := r.Context()
-	reqID := GetReqID(r)
+	reqID := logger.GetRequestID(ctx)
+
+	log.Info(
+		action.Registration,
+		"registration request started",
+		"requestID", reqID,
+	)
 
 	var req models.User
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.log.Error(action.Registration, "error in parsing request", reqID, "", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Error(
+			action.Registration,
+			"error parsing request body",
+			"requestID", reqID,
+			"error", err,
+		)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if er, msg := dto.ValidateLogin(req.Email, req.Password); !er {
-		h.log.Error(action.Registration, msg, reqID, "", ErrorInValidateLogin)
-		http.Error(w, msg, http.StatusUnauthorized)
+		log.Error(
+			action.Registration, msg,
+			"requestID", reqID,
+			"error", ErrorInValidateLogin,
+		)
+		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
+	dto.GetRole(h.cfg.Mode, &req)
+
 	err := h.svc.CreateNewUser(ctx, reqID, req)
 	if err != nil {
-		if errors.Is(err, models.ErrUserAlreadyExists) {
+		if errors.Is(err, types.ErrUserAlreadyExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	w.WriteHeader(http.StatusCreated)
+
+	writeJSON(w, http.StatusCreated, map[string]string{"message": "registration successful"})
 }
 
 func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
+	log := h.log.Func("Login")
 	ctx := r.Context()
-	reqID := GetReqID(r)
+	reqID := logger.GetRequestID(ctx)
+
+	log.Info(action.Login, "login request started", "requestID", reqID)
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Error(
+			action.Login,
+			"error reading body",
+			"requestID", reqID,
+			"error", err,
+		)
+
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(body) == 0 {
+		log.Warn(action.Login,
+			"empty request body",
+			"requestID", reqID,
+		)
+
+		http.Error(w, "empty request body", http.StatusBadRequest)
+		return
+	}
+
 	var user models.User
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		h.log.Error(action.Login, "error in parsing request", reqID, "", err)
+	if err = json.Unmarshal(body, &user); err != nil {
+		log.Error(
+			action.Login,
+			"invalid JSON",
+			"requestID", reqID,
+			"error", err,
+		)
 		return
 	}
 
 	token, err := h.svc.Login(ctx, reqID, user)
 	if err != nil {
-		if errors.Is(err, models.ErrUserNotFound) {
+		switch {
+		case errors.Is(err, types.ErrUserNotFound):
 			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		} else if errors.Is(err, models.ErrIncorrectPassword) {
+		case errors.Is(err, types.ErrIncorrectPassword):
 			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
+		default:
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 		}
-		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -95,16 +142,13 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   h.cfg.JWT.ExpireHours * 60 * 60,
 	})
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "login successful"})
+
+	log.Info(action.Login, "user successfully logged in", "requestID", reqID)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "login successful"})
 }
 
-func GetReqID(r *http.Request) string {
-	if v := r.Context().Value(reqIDKey); v != nil {
-		if id, ok := v.(string); ok {
-			return id
-		}
-	}
-	return ""
+func writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
 }

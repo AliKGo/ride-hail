@@ -24,5 +24,5 @@ services:
   admin_service: ${ADMIN_SERVICE_PORT:-3004}
 
 jwt:
-  secret: "V9muwjpb7rRfuAH0fNg+8g80/42v0kT7f7W67cabf3uCpMXATsE0Gzg/3GJtultt"
+  secret: ${secret:-V9muwjpb7rRfuAH0fNg+8g80/42v0kT7f7W67cabf3uCpMXATsE0Gzg/3GJtultt}
   expire_hours: 2

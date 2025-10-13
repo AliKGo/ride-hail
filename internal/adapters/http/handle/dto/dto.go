@@ -2,6 +2,8 @@ package dto
 
 import (
 	"ride-hail/internal/adapters/http/handle/dto/validate"
+	"ride-hail/internal/core/domain/models"
+	"ride-hail/internal/core/domain/types"
 	"strings"
 )
 
@@ -27,4 +29,15 @@ func ValidateLogin(email string, password string) (bool, string) {
 	}
 
 	return false, strings.Join(res, ", ")
+}
+
+func GetRole(mode string, user *models.User) {
+	switch mode {
+	case types.ModeAdmin:
+		user.Role = types.RoleAdmin
+	case types.ModeDAL:
+		user.Role = types.RoleDriver
+	case types.ModeRide:
+		user.Role = types.RoleCustomer
+	}
 }

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"os"
-	"ride-hail/internal/core/domain/models"
+	"ride-hail/internal/core/domain/types"
 	"ride-hail/pkg/potgres"
 	"ride-hail/pkg/rabbit"
 	"strconv"
@@ -139,12 +139,20 @@ func parseConfig(filename string) (*Config, error) {
 			}
 		}
 	}
+
+	if cfg.Database.MaxOpenConns == 0 {
+		cfg.Database.MaxOpenConns = 25
+	}
+	if cfg.Database.MaxIdleTime == "" {
+		cfg.Database.MaxIdleTime = "15m"
+	}
+
 	return &cfg, scanner.Err()
 }
 
 func (cfg *Config) parseMode(mode string) bool {
 	switch mode {
-	case models.ModeAdmin, models.ModeRide, models.ModeDAL:
+	case types.ModeAdmin, types.ModeRide, types.ModeDAL:
 		cfg.Mode = mode
 	default:
 		return false

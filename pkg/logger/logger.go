@@ -1,35 +1,21 @@
 package logger
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"runtime/debug"
+	"ride-hail/internal/core/domain/models"
 	"time"
 )
 
 const (
 	LevelDebug = "DEBUG"
 	LevelInfo  = "INFO"
+	LevelWarn  = "WARN"
 	LevelError = "ERROR"
 )
-
-type LogEntry struct {
-	Timestamp string      `json:"timestamp"`
-	Level     string      `json:"level"`
-	Service   string      `json:"service"`
-	Action    string      `json:"action"`
-	Message   string      `json:"message"`
-	Hostname  string      `json:"hostname"`
-	RequestID string      `json:"request_id"`
-	RideID    string      `json:"ride_id,omitempty"`
-	Error     *ErrorEntry `json:"error,omitempty"`
-}
-
-type ErrorEntry struct {
-	Msg   string `json:"msg"`
-	Stack string `json:"stack"`
-}
 
 type Logger struct {
 	service  string
@@ -37,44 +23,94 @@ type Logger struct {
 }
 
 func New(service string) *Logger {
-	hostname, _ := os.Hostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown-host"
+	}
 	return &Logger{
 		service:  service,
 		hostname: hostname,
 	}
 }
 
-func (l *Logger) log(level, action, message, requestID, rideID string, err error) {
-	entry := LogEntry{
-		Timestamp: time.Now().UTC().Format(time.RFC3339), // ISO 8601
-		Level:     level,
-		Service:   l.service,
-		Action:    action,
-		Message:   message,
-		Hostname:  l.hostname,
-		RequestID: requestID,
-		RideID:    rideID,
+func (l *Logger) Func(funcName string) *FuncLogger {
+	return &FuncLogger{
+		service:  l.service,
+		funcName: funcName,
+		hostname: l.hostname,
+	}
+}
+
+type FuncLogger struct {
+	service  string
+	funcName string
+	hostname string
+}
+
+// Основной метод логирования
+func (f *FuncLogger) log(level, action, message string, fields ...interface{}) {
+	// сначала фиксированные поля
+	order := []struct {
+		key string
+		val interface{}
+	}{
+		{"level", level},
+		{"timestamp", time.Now().Format(time.RFC3339)},
+		{"service", f.service},
+		{"func", f.funcName},
+		{"action", action},
+		{"message", message},
+		{"hostname", f.hostname},
 	}
 
-	if level == LevelError && err != nil {
-		entry.Error = &ErrorEntry{
-			Msg:   err.Error(),
-			Stack: string(debug.Stack()),
+	// буфер для сборки JSON вручную
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+
+	for i, kv := range order {
+		b, _ := json.Marshal(kv.val)
+		fmt.Fprintf(&buf, `"%s":%s`, kv.key, b)
+		if i < len(order)-1 {
+			buf.WriteByte(',')
 		}
 	}
 
-	data, _ := json.Marshal(entry)
-	fmt.Fprintln(os.Stdout, string(data))
+	for i := 0; i < len(fields)-1; i += 2 {
+		key, ok := fields[i].(string)
+		if !ok {
+			continue
+		}
+		val, _ := json.Marshal(fields[i+1])
+		buf.WriteByte(',')
+		fmt.Fprintf(&buf, `"%s":%s`, key, val)
+	}
+
+	buf.WriteByte('}')
+	fmt.Fprintln(os.Stdout, buf.String())
 }
 
-func (l *Logger) Info(action, msg, requestID, rideID string) {
-	l.log(LevelInfo, action, msg, requestID, rideID, nil)
+func (f *FuncLogger) Debug(action, message string, fields ...interface{}) {
+	f.log(LevelDebug, action, message, fields...)
+}
+func (f *FuncLogger) Info(action, message string, fields ...interface{}) {
+	f.log(LevelInfo, action, message, fields...)
+}
+func (f *FuncLogger) Warn(action, message string, fields ...interface{}) {
+	f.log(LevelWarn, action, message, fields...)
+}
+func (f *FuncLogger) Error(action, message string, fields ...interface{}) {
+	f.log(LevelError, action, message, fields...)
 }
 
-func (l *Logger) Debug(action, msg, requestID, rideID string) {
-	l.log(LevelDebug, action, msg, requestID, rideID, nil)
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, models.GetRequestIDKey(), requestID)
 }
 
-func (l *Logger) Error(action, msg, requestID, rideID string, err error) {
-	l.log(LevelError, action, msg, requestID, rideID, err)
+func GetRequestID(ctx context.Context) string {
+	if v := ctx.Value(models.GetRequestIDKey()); v != nil {
+		if id, ok := v.(string); ok {
+			return id
+		}
+	}
+	return ""
 }
