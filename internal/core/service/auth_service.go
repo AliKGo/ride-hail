@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"ride-hail/config"
 	"ride-hail/internal/core/domain/action"
@@ -30,10 +33,10 @@ func NewAuthService(cfg config.Config, repo ports.UserRepository, log *logger.Lo
 }
 
 // Login returning token and error
-func (s *AuthService) Login(ctx context.Context, reqId string, user models.User) (string, error) {
+func (s *AuthService) Login(ctx context.Context, user models.User) (string, error) {
 	log := s.log.Func("Login")
 
-	u, err := s.repo.GetGyUserEmail(ctx, reqId, user.Email)
+	u, err := s.repo.GetGyUserEmail(ctx, user.Email)
 	if err != nil {
 		return "", err
 	}
@@ -41,9 +44,9 @@ func (s *AuthService) Login(ctx context.Context, reqId string, user models.User)
 	ok, err := hash.VerifyPassword(u.Password, user.Password)
 	if err != nil {
 		log.Error(
+			ctx,
 			action.Login,
 			"error verifying password",
-			"requestID", reqId,
 			"userID", u.ID,
 			"error", err,
 		)
@@ -51,16 +54,17 @@ func (s *AuthService) Login(ctx context.Context, reqId string, user models.User)
 	}
 	if !ok {
 		log.Warn(
+			ctx,
 			action.Login,
 			"incorrect password",
-			"requestID", reqId,
 		)
 		return "", types.ErrIncorrectPassword
 	}
-  
+
 	claims := models.Claims{
-		UserID: u.ID,
-		Role:   u.Role,
+		ClaimsID: newClaimsID(),
+		UserID:   u.ID,
+		Role:     u.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -72,9 +76,9 @@ func (s *AuthService) Login(ctx context.Context, reqId string, user models.User)
 	tokenString, err := token.SignedString([]byte(s.secretKey))
 	if err != nil {
 		log.Error(
+			ctx,
 			action.Login,
 			"error generating JWT token",
-			"requestID", reqId,
 			"error", err,
 		)
 		return "", err
@@ -83,24 +87,32 @@ func (s *AuthService) Login(ctx context.Context, reqId string, user models.User)
 	return tokenString, nil
 }
 
-func (s *AuthService) CreateNewUser(ctx context.Context, reqId string, user models.User) error {
+func (s *AuthService) CreateNewUser(ctx context.Context, user models.User) error {
 	log := s.log.Func("CreateNewUser")
 
 	hashPass, err := hash.HashPassword(user.Password)
 	if err != nil {
 		log.Error(
+			ctx,
 			action.Registration,
 			"error hashing password",
-			"requestID", reqId,
 			"error", err,
 		)
 		return err
 	}
 
 	user.Password = hashPass
-	err = s.repo.CreateNewUser(ctx, reqId, user)
+	err = s.repo.CreateNewUser(ctx, user)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func newClaimsID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return hex.EncodeToString(fmt.Appendf(nil, "%d", time.Now().UnixNano()))
+	}
+	return hex.EncodeToString(b)
 }

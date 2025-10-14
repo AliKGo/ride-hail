@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"ride-hail/internal/core/domain/models"
 	"time"
 )
 
+// уровни логов (по желанию)
 const (
 	LevelDebug = "DEBUG"
 	LevelInfo  = "INFO"
@@ -17,62 +19,68 @@ const (
 	LevelError = "ERROR"
 )
 
+// Logger — основной логгер, создаётся на уровне сервиса
 type Logger struct {
 	service  string
 	hostname string
+	slog     *slog.Logger
 }
 
-func New(service string) *Logger {
+// New создает новый логгер.
+// pretty=true → красиво в консоли (dev)
+// pretty=false → компактный JSON (prod)
+func New(service string, pretty bool) *Logger {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown-host"
 	}
+
+	var handler slog.Handler
+	if pretty {
+		handler = NewPrettyJSONHandler(os.Stdout, slog.LevelDebug)
+	} else {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+	}
+
 	return &Logger{
 		service:  service,
 		hostname: hostname,
+		slog:     slog.New(handler),
 	}
 }
 
-func (l *Logger) Func(funcName string) *FuncLogger {
+// Func создаёт логгер для конкретной функции (или метода)
+func (l *Logger) Func(prefix string) *FuncLogger {
 	return &FuncLogger{
 		service:  l.service,
-		funcName: funcName,
+		prefix:   prefix,
 		hostname: l.hostname,
+		slog:     l.slog,
 	}
 }
 
+// FuncLogger — логгер уровня функции
 type FuncLogger struct {
 	service  string
-	funcName string
+	prefix   string
 	hostname string
+	slog     *slog.Logger
 }
 
-// Основной метод логирования
-func (f *FuncLogger) log(level, action, message string, fields ...interface{}) {
-	// сначала фиксированные поля
-	order := []struct {
-		key string
-		val interface{}
-	}{
-		{"level", level},
-		{"timestamp", time.Now().Format(time.RFC3339)},
-		{"service", f.service},
-		{"func", f.funcName},
-		{"action", action},
-		{"message", message},
-		{"hostname", f.hostname},
+func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message string, fields ...interface{}) {
+	reqID := GetRequestID(ctx)
+
+	attrs := []slog.Attr{
+		slog.String("service", f.service),
+		slog.String("func_name", f.prefix),
+		slog.String("action", action),
+		slog.String("hostname", f.hostname),
 	}
 
-	// буфер для сборки JSON вручную
-	var buf bytes.Buffer
-	buf.WriteByte('{')
-
-	for i, kv := range order {
-		b, _ := json.Marshal(kv.val)
-		fmt.Fprintf(&buf, `"%s":%s`, kv.key, b)
-		if i < len(order)-1 {
-			buf.WriteByte(',')
-		}
+	if reqID != "" {
+		attrs = append(attrs, slog.String("request_id", reqID))
 	}
 
 	for i := 0; i < len(fields)-1; i += 2 {
@@ -80,28 +88,27 @@ func (f *FuncLogger) log(level, action, message string, fields ...interface{}) {
 		if !ok {
 			continue
 		}
-		val, _ := json.Marshal(fields[i+1])
-		buf.WriteByte(',')
-		fmt.Fprintf(&buf, `"%s":%s`, key, val)
+		attrs = append(attrs, slog.Any(key, fields[i+1]))
 	}
 
-	buf.WriteByte('}')
-	fmt.Fprintln(os.Stdout, buf.String())
+	f.slog.LogAttrs(ctx, level, message, attrs...)
 }
 
-func (f *FuncLogger) Debug(action, message string, fields ...interface{}) {
-	f.log(LevelDebug, action, message, fields...)
+// Методы уровней логирования
+func (f *FuncLogger) Debug(ctx context.Context, action, message string, fields ...interface{}) {
+	f.log(ctx, slog.LevelDebug, action, message, fields...)
 }
-func (f *FuncLogger) Info(action, message string, fields ...interface{}) {
-	f.log(LevelInfo, action, message, fields...)
+func (f *FuncLogger) Info(ctx context.Context, action, message string, fields ...interface{}) {
+	f.log(ctx, slog.LevelInfo, action, message, fields...)
 }
-func (f *FuncLogger) Warn(action, message string, fields ...interface{}) {
-	f.log(LevelWarn, action, message, fields...)
+func (f *FuncLogger) Warn(ctx context.Context, action, message string, fields ...interface{}) {
+	f.log(ctx, slog.LevelWarn, action, message, fields...)
 }
-func (f *FuncLogger) Error(action, message string, fields ...interface{}) {
-	f.log(LevelError, action, message, fields...)
+func (f *FuncLogger) Error(ctx context.Context, action, message string, fields ...interface{}) {
+	f.log(ctx, slog.LevelError, action, message, fields...)
 }
 
+// контекст для request_id
 func WithRequestID(ctx context.Context, requestID string) context.Context {
 	return context.WithValue(ctx, models.GetRequestIDKey(), requestID)
 }
@@ -113,4 +120,50 @@ func GetRequestID(ctx context.Context) string {
 		}
 	}
 	return ""
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PRETTY JSON HANDLER — красивый вывод JSON для dev
+////////////////////////////////////////////////////////////////////////////////
+
+type PrettyJSONHandler struct {
+	out   io.Writer
+	level slog.Leveler
+}
+
+func NewPrettyJSONHandler(out io.Writer, level slog.Leveler) *PrettyJSONHandler {
+	return &PrettyJSONHandler{out: out, level: level}
+}
+
+func (h *PrettyJSONHandler) Enabled(_ context.Context, lvl slog.Level) bool {
+	return lvl >= h.level.Level()
+}
+
+func (h *PrettyJSONHandler) Handle(_ context.Context, r slog.Record) error {
+	data := make(map[string]interface{})
+	data["time"] = r.Time.Format(time.RFC3339)
+	data["level"] = r.Level.String()
+	data["msg"] = r.Message
+
+	r.Attrs(func(a slog.Attr) bool {
+		data[a.Key] = a.Value.Any()
+		return true
+	})
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(data); err != nil {
+		return err
+	}
+	_, err := h.out.Write(buf.Bytes())
+	return err
+}
+
+func (h *PrettyJSONHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *PrettyJSONHandler) WithGroup(name string) slog.Handler {
+	return h
 }

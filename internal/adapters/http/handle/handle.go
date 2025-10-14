@@ -38,6 +38,7 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 	reqID := logger.GetRequestID(ctx)
 
 	log.Info(
+		ctx,
 		action.Registration,
 		"registration request started",
 		"requestID", reqID,
@@ -46,6 +47,7 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 	var req models.User
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Error(
+			ctx,
 			action.Registration,
 			"error parsing request body",
 			"requestID", reqID,
@@ -57,6 +59,7 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 
 	if er, msg := dto.ValidateLogin(req.Email, req.Password); !er {
 		log.Error(
+			ctx,
 			action.Registration, msg,
 			"requestID", reqID,
 			"error", ErrorInValidateLogin,
@@ -67,7 +70,7 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 
 	dto.GetRole(h.cfg.Mode, &req)
 
-	err := h.svc.CreateNewUser(ctx, reqID, req)
+	err := h.svc.CreateNewUser(ctx, req)
 	if err != nil {
 		if errors.Is(err, types.ErrUserAlreadyExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -83,16 +86,15 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 	log := h.log.Func("Login")
 	ctx := r.Context()
-	reqID := logger.GetRequestID(ctx)
 
-	log.Info(action.Login, "login request started", "requestID", reqID)
+	log.Info(ctx, action.Login, "login request started")
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Error(
+			ctx,
 			action.Login,
 			"error reading body",
-			"requestID", reqID,
 			"error", err,
 		)
 
@@ -100,9 +102,10 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(body) == 0 {
-		log.Warn(action.Login,
+		log.Warn(
+			ctx,
+			action.Login,
 			"empty request body",
-			"requestID", reqID,
 		)
 
 		http.Error(w, "empty request body", http.StatusBadRequest)
@@ -112,15 +115,15 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	if err = json.Unmarshal(body, &user); err != nil {
 		log.Error(
+			ctx,
 			action.Login,
 			"invalid JSON",
-			"requestID", reqID,
 			"error", err,
 		)
 		return
 	}
 
-	token, err := h.svc.Login(ctx, reqID, user)
+	token, err := h.svc.Login(ctx, user)
 	if err != nil {
 		switch {
 		case errors.Is(err, types.ErrUserNotFound):
@@ -143,7 +146,7 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   h.cfg.JWT.ExpireHours * 60 * 60,
 	})
 
-	log.Info(action.Login, "user successfully logged in", "requestID", reqID)
+	log.Info(ctx, action.Login, "user successfully logged in")
 	writeJSON(w, http.StatusOK, map[string]string{"message": "login successful"})
 }
 

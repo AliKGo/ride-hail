@@ -3,19 +3,21 @@ package server
 import (
 	"net/http"
 	"ride-hail/config"
-	"ride-hail/internal/adapters/http/handle"
+	"ride-hail/internal/core/ports"
 	"strconv"
 )
 
 type API struct {
-	h    *handle.Handle
+	h    ports.AuthHandler
 	mux  *http.ServeMux
 	addr int
+	cfg  config.Config
 }
 
-func New(h *handle.Handle, cfg config.Config) *API {
+func New(h ports.AuthHandler, cfg config.Config) *API {
 	api := &API{
 		h:    h,
+		cfg:  cfg,
 		addr: cfg.Services.RideService,
 	}
 

@@ -6,6 +6,7 @@ import (
 	"ride-hail/internal/adapters/http/handle"
 	"ride-hail/internal/adapters/http/server"
 	postgres2 "ride-hail/internal/adapters/postgres"
+	"ride-hail/internal/core/ports"
 	"ride-hail/internal/core/service"
 	"ride-hail/pkg/logger"
 	postgres "ride-hail/pkg/potgres"
@@ -17,9 +18,9 @@ type Service interface {
 }
 
 type App struct {
-	svc Service
-	api *server.API
-	log *logger.Logger
+	svc      Service
+	authServ ports.AuthServices
+	log      *logger.Logger
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -27,25 +28,28 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	log := logger.New(cfg.Mode, false)
 
-	log := logger.New(cfg.Mode)
-
-	repo := postgres2.NewRepo(db.Pool, log)
-	authSvc := service.NewAuthService(cfg, repo, log)
-
-	handle := handle.New(cfg, authSvc, log)
-
-	api := server.New(handle, cfg)
+	authSvc := initAuth(db, cfg, log)
 
 	return &App{
-		api: api,
-		log: log,
+		authServ: authSvc,
+		log:      log,
 	}, nil
 }
 
 func (app *App) Start() {
-	err := app.api.Run()
+	err := app.authServ.Run()
 	if err != nil {
 		return
 	}
+}
+
+func initAuth(db *postgres.Postgres, cfg config.Config, log *logger.Logger) ports.AuthServices {
+	repo := postgres2.NewRepo(db.Pool, log)
+	authSvc := service.NewAuthService(cfg, repo, log)
+
+	h := handle.New(cfg, authSvc, log)
+
+	return server.New(h, cfg)
 }

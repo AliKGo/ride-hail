@@ -24,13 +24,12 @@ func NewRepo(pool *pgxpool.Pool, log *logger.Logger) *UserRepository {
 	}
 }
 
-func (p *UserRepository) CreateNewUser(ctx context.Context, reqId string, user models.User) error {
+func (p *UserRepository) CreateNewUser(ctx context.Context, user models.User) error {
 	log := p.log.Func("CreateNewUser")
 
-	log.Info(
+	log.Info(ctx,
 		action.Registration,
 		"start creating user",
-		"requestID", reqId,
 	)
 
 	query := `
@@ -43,17 +42,17 @@ func (p *UserRepository) CreateNewUser(ctx context.Context, reqId string, user m
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			log.Warn(
+				ctx,
 				action.Registration,
 				"user already exists",
-				"requestID", reqId,
 				"email", user.Email,
 			)
 			return types.ErrUserAlreadyExists
 		}
 		log.Error(
+			ctx,
 			action.Registration,
 			"error when inserting user into postgres",
-			"requestID", reqId,
 			"error", err.Error(),
 		)
 
@@ -61,21 +60,21 @@ func (p *UserRepository) CreateNewUser(ctx context.Context, reqId string, user m
 	}
 
 	log.Info(
+		ctx,
 		action.Registration,
 		"user successfully created",
-		"requestID", reqId,
 	)
 	return nil
 }
 
 // GetGyUserEmail dsvsdf
-func (p *UserRepository) GetGyUserEmail(ctx context.Context, reqId string, email string) (models.User, error) {
+func (p *UserRepository) GetGyUserEmail(ctx context.Context, email string) (models.User, error) {
 	log := p.log.Func("GetGyUserEmail")
 
 	log.Debug(
+		ctx,
 		action.Login,
 		"start getting user by email",
-		"requestID", reqId,
 		"email", email,
 	)
 
@@ -93,17 +92,17 @@ func (p *UserRepository) GetGyUserEmail(ctx context.Context, reqId string, email
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			log.Warn(
+				ctx,
 				action.Login,
 				"user not found",
-				"request_id", reqId,
 			)
 			return models.User{}, types.ErrUserNotFound
 		}
 
 		log.Error(
+			ctx,
 			action.Login,
 			"error when getting user by email",
-			"request_id", reqId,
 			"error", err.Error(),
 		)
 
@@ -111,9 +110,9 @@ func (p *UserRepository) GetGyUserEmail(ctx context.Context, reqId string, email
 	}
 
 	log.Info(
+		ctx,
 		action.Login,
 		"user successfully retrieved",
-		"requestID", reqId,
 	)
 
 	return user, nil
