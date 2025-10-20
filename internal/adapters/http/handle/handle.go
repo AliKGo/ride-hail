@@ -137,7 +137,7 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "auth",
+		Name:     "Authorization",
 		Value:    token,
 		HttpOnly: true,
 		Secure:   true,

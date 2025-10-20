@@ -67,7 +67,6 @@ func (p *UserRepository) CreateNewUser(ctx context.Context, user models.User) er
 	return nil
 }
 
-// GetGyUserEmail dsvsdf
 func (p *UserRepository) GetGyUserEmail(ctx context.Context, email string) (models.User, error) {
 	log := p.log.Func("GetGyUserEmail")
 

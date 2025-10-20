@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -26,16 +25,17 @@ func (a *API) Middleware(next http.Handler) http.Handler {
 
 func (a *API) jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Header.Get("auth")
+		token := r.Header.Get("Authorization")
 		if token == "" {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 
 		t, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
+
 			return a.cfg.JWT.Secret, nil
 		})
 
@@ -45,13 +45,20 @@ func (a *API) jwtMiddleware(next http.Handler) http.Handler {
 		}
 
 		if claims, ok := t.Claims.(jwt.MapClaims); ok {
-			userID, ok := claims["user_id"].(string)
-			if !ok {
+			userID, okId := claims["user_id"].(string)
+			role, okRole := claims["role"].(string)
+
+			if !okId || !okRole {
 				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
-			ctx := context.WithValue(r.Context(), "user_id", userID)
+
+			ctx := logger.WithUserID(r.Context(), userID)
+			ctx = logger.WithRole(ctx, role)
 			next.ServeHTTP(w, r.WithContext(ctx))
+		} else {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
 		}
 	})
 }

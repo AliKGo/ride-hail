@@ -122,6 +122,32 @@ func GetRequestID(ctx context.Context) string {
 	return ""
 }
 
+func WithUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, models.GetUserIDKey(), userID)
+}
+
+func GetUserID(ctx context.Context) string {
+	if v := ctx.Value(models.GetUserIDKey()); v != nil {
+		if id, ok := v.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+func WithRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, models.GetRoleKey(), role)
+}
+
+func GetRole(ctx context.Context) string {
+	if v := ctx.Value(models.GetRoleKey()); v != nil {
+		if r, ok := v.(string); ok {
+			return r
+		}
+	}
+	return ""
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // PRETTY JSON HANDLER — красивый вывод JSON для dev
 ////////////////////////////////////////////////////////////////////////////////
