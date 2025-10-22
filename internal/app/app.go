@@ -46,7 +46,7 @@ func (app *App) Start() {
 }
 
 func initAuth(db *postgres.Postgres, cfg config.Config, log *logger.Logger) ports.AuthServices {
-	repo := postgres2.NewRepo(db.Pool, log)
+	repo := postgres2.NewRepo(db.Pool)
 	authSvc := service.NewAuthService(cfg, repo, log)
 
 	h := handle.New(cfg, authSvc, log)

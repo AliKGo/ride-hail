@@ -6,3 +6,8 @@ var (
 	StartApplication = "start application"
 	StopApplication  = "stop application"
 )
+
+var (
+	CreateRide = "create ride"
+	CloseRide  = "close ride"
+)

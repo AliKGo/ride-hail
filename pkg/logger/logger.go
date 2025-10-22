@@ -71,6 +71,7 @@ type FuncLogger struct {
 
 func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message string, fields ...interface{}) {
 	reqID := GetRequestID(ctx)
+	userID := GetUserID(ctx)
 
 	attrs := []slog.Attr{
 		slog.String("service", f.service),
@@ -81,6 +82,10 @@ func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message 
 
 	if reqID != "" {
 		attrs = append(attrs, slog.String("request_id", reqID))
+	}
+
+	if userID != "" {
+		attrs = append(attrs, slog.String("user_id", userID))
 	}
 
 	for i := 0; i < len(fields)-1; i += 2 {

@@ -7,31 +7,38 @@ import (
 	"strings"
 )
 
-func ValidateLogin(email string, password string) (bool, string) {
+var mode string
+
+func ValidateLogin(u *models.User) (bool, string) {
 	var res []string
 
-	if !validate.ValidateEmail(email, true) {
+	if !validate.ValidateEmail(u.Email, true) {
 		res = append(res, "email is invalid")
 	}
 
 	localPart := ""
-	parts := strings.Split(email, "@")
+	parts := strings.Split(u.Email, "@")
 	if len(parts) == 2 {
 		localPart = parts[0]
 	}
 
-	if ok, msg := validate.ValidatePassword(password, localPart); !ok {
+	if ok, msg := validate.ValidatePassword(u.Password, localPart); !ok {
 		res = append(res, msg)
 	}
 
 	if len(res) == 0 {
+		getRole(u)
 		return true, ""
 	}
 
 	return false, strings.Join(res, ", ")
 }
 
-func GetRole(mode string, user *models.User) {
+func InitMode(m string) {
+	mode = m
+}
+
+func getRole(user *models.User) {
 	switch mode {
 	case types.ModeAdmin:
 		user.Role = types.RoleAdmin

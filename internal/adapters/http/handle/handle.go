@@ -15,16 +15,17 @@ import (
 )
 
 type Handle struct {
-	svc ports.AuthService
-	log *logger.Logger
-	cfg config.Config
+	svc    ports.AuthService
+	log    *logger.Logger
+	expJWT int
 }
 
 func New(cfg config.Config, svc ports.AuthService, log *logger.Logger) *Handle {
+	dto.InitMode(cfg.Mode)
 	return &Handle{
-		svc: svc,
-		log: log,
-		cfg: cfg,
+		svc:    svc,
+		log:    log,
+		expJWT: cfg.JWT.ExpireHours,
 	}
 }
 
@@ -32,16 +33,18 @@ var (
 	ErrorInValidateLogin = errors.New("validation error")
 )
 
+var (
+	msgForbidden = "you don't have access to make such requests"
+)
+
 func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 	log := h.log.Func("Registration")
 	ctx := r.Context()
-	reqID := logger.GetRequestID(ctx)
 
-	log.Info(
+	log.Debug(
 		ctx,
 		action.Registration,
 		"registration request started",
-		"requestID", reqID,
 	)
 
 	var req models.User
@@ -50,25 +53,21 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 			ctx,
 			action.Registration,
 			"error parsing request body",
-			"requestID", reqID,
 			"error", err,
 		)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if er, msg := dto.ValidateLogin(req.Email, req.Password); !er {
+	if ok, msg := dto.ValidateLogin(&req); !ok {
 		log.Error(
 			ctx,
 			action.Registration, msg,
-			"requestID", reqID,
 			"error", ErrorInValidateLogin,
 		)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
-
-	dto.GetRole(h.cfg.Mode, &req)
 
 	err := h.svc.CreateNewUser(ctx, req)
 	if err != nil {
@@ -80,6 +79,7 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Debug(ctx, action.Registration, "registration request finished")
 	writeJSON(w, http.StatusCreated, map[string]string{"message": "registration successful"})
 }
 
@@ -87,7 +87,7 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 	log := h.log.Func("Login")
 	ctx := r.Context()
 
-	log.Info(ctx, action.Login, "login request started")
+	log.Debug(ctx, action.Login, "login request started")
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -143,7 +143,7 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 		Path:     "/",
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   h.cfg.JWT.ExpireHours * 60 * 60,
+		MaxAge:   h.expJWT * 60 * 60,
 	})
 
 	log.Info(ctx, action.Login, "user successfully logged in")
