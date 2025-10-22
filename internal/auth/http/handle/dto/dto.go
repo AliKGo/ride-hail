@@ -1,10 +1,11 @@
 package dto
 
 import (
-	"ride-hail/internal/adapters/http/handle/dto/validate"
+	"strings"
+
+	"ride-hail/internal/auth/http/handle/dto/validate"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
-	"strings"
 )
 
 func ValidateLogin(email string, password string) (bool, string) {

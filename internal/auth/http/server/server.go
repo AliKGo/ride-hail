@@ -2,9 +2,10 @@ package server
 
 import (
 	"net/http"
-	"ride-hail/config"
-	"ride-hail/internal/core/ports"
 	"strconv"
+
+	"ride-hail/internal/config"
+	"ride-hail/internal/core/ports"
 )
 
 type API struct {

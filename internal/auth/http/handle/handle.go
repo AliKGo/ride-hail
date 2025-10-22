@@ -5,8 +5,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"ride-hail/config"
-	"ride-hail/internal/adapters/http/handle/dto"
+
+	"ride-hail/internal/auth/http/handle/dto"
+	"ride-hail/internal/config"
 	"ride-hail/internal/core/domain/action"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
@@ -28,9 +29,7 @@ func New(cfg config.Config, svc ports.AuthService, log *logger.Logger) *Handle {
 	}
 }
 
-var (
-	ErrorInValidateLogin = errors.New("validation error")
-)
+var ErrorInValidateLogin = errors.New("validation error")
 
 func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 	log := h.log.Func("Registration")

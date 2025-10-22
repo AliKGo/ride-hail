@@ -4,8 +4,9 @@ import (
 	"context"
 	"flag"
 	"log/slog"
-	"ride-hail/config"
+
 	"ride-hail/internal/app"
+	"ride-hail/internal/config"
 )
 
 var (
@@ -25,7 +26,8 @@ func Run() {
 	app, err := app.New(ctx, *cfg)
 	if err != nil {
 		slog.Error("error in creating app", err)
-		//cansel()
+
+		// cansel()
 		return
 	}
 	app.Start()

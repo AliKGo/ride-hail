@@ -5,15 +5,17 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"ride-hail/config"
+	"time"
+
+	"ride-hail/internal/config"
 	"ride-hail/internal/core/domain/action"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
 	"ride-hail/internal/core/ports"
 	"ride-hail/internal/core/service/hash"
 	"ride-hail/pkg/logger"
-	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthService struct {

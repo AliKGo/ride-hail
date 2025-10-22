@@ -2,10 +2,11 @@ package app
 
 import (
 	"context"
-	"ride-hail/config"
-	"ride-hail/internal/adapters/http/handle"
-	"ride-hail/internal/adapters/http/server"
-	postgres2 "ride-hail/internal/adapters/postgres"
+
+	"ride-hail/internal/auth/http/handle"
+	"ride-hail/internal/auth/http/server"
+	postgres2 "ride-hail/internal/auth/postgres"
+	"ride-hail/internal/config"
 	"ride-hail/internal/core/ports"
 	"ride-hail/internal/core/service"
 	"ride-hail/pkg/logger"
