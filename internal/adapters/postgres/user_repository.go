@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
+	"ride-hail/pkg/executor"
 )
 
 type UserRepository struct {
@@ -20,13 +21,15 @@ func NewRepo(pool *pgxpool.Pool) *UserRepository {
 	}
 }
 
-func (p *UserRepository) CreateNewUser(ctx context.Context, user models.User) error {
+func (repo *UserRepository) CreateNewUser(ctx context.Context, user models.User) error {
+	ex := executor.GetExecutor(ctx, repo.pool)
+
 	query := `
 	INSERT INTO users (email, role, password_hash)
 	VALUES ($1, $2, $3)
 	`
 
-	_, err := p.pool.Exec(ctx, query, user.Email, user.Role, user.Password)
+	_, err := ex.Exec(ctx, query, user.Email, user.Role, user.Password)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -37,11 +40,13 @@ func (p *UserRepository) CreateNewUser(ctx context.Context, user models.User) er
 	return nil
 }
 
-func (p *UserRepository) GetGyUserEmail(ctx context.Context, email string) (models.User, error) {
+func (repo *UserRepository) GetGyUserEmail(ctx context.Context, email string) (models.User, error) {
+	ex := executor.GetExecutor(ctx, repo.pool)
+
 	query := `SELECT id, email, role, status, password_hash FROM users WHERE email = $1`
 
 	var user models.User
-	err := p.pool.QueryRow(ctx, query, email).Scan(
+	err := ex.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.Email,
 		&user.Role,

@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
+	"ride-hail/pkg/executor"
 )
 
 type RideRepository struct {
@@ -21,6 +22,8 @@ func NewRideRepository(pool *pgxpool.Pool) *RideRepository {
 }
 
 func (repo *RideRepository) CreateNewRide(ctx context.Context, ride models.Ride) (string, error) {
+	ex := executor.GetExecutor(ctx, repo.pool)
+
 	query := `INSERT INTO rides (
 		ride_number, passenger_id, vehicle_type, status,
 		estimated_fare, pickup_coordinate_id
@@ -28,7 +31,7 @@ func (repo *RideRepository) CreateNewRide(ctx context.Context, ride models.Ride)
 	RETURNING id`
 
 	var id string
-	err := repo.pool.QueryRow(
+	err := ex.QueryRow(
 		ctx, query,
 		ride.RideNumber,
 		ride.PassengerID,
@@ -45,6 +48,8 @@ func (repo *RideRepository) CreateNewRide(ctx context.Context, ride models.Ride)
 }
 
 func (repo *RideRepository) GetRide(ctx context.Context, id string) (models.Ride, error) {
+	ex := executor.GetExecutor(ctx, repo.pool)
+
 	query := `
 	SELECT id, created_at, updated_at, ride_number, passenger_id, driver_id, vehicle_type,
 	       status, priority, requested_at, matched_at, arrived_at, started_at,
@@ -56,7 +61,7 @@ func (repo *RideRepository) GetRide(ctx context.Context, id string) (models.Ride
 
 	var ride models.Ride
 
-	err := repo.pool.QueryRow(ctx, query, id).Scan(
+	err := ex.QueryRow(ctx, query, id).Scan(
 		&ride.ID,
 		&ride.CreatedAt,
 		&ride.UpdatedAt,

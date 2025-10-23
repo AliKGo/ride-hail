@@ -80,9 +80,14 @@ func (h *RideHandle) CancelRide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if err := h.svc.CloseRide(ctx, closeReq); err != nil {
-	//
-	//}
+	if resp, err := h.svc.CloseRide(ctx, closeReq); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	} else {
+		log.Debug(ctx, action.CloseRide, "the request to cancel the ride has been completed")
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
 }
 
 func getRideID(r *http.Request) string {

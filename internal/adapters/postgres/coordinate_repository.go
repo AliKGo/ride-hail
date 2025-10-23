@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ride-hail/internal/core/domain/models"
+	"ride-hail/pkg/executor"
 )
 
 type CordRepository struct {
@@ -20,6 +21,8 @@ func NewCordRepository(pool *pgxpool.Pool) *CordRepository {
 }
 
 func (repo *CordRepository) CreateNewCoordinate(ctx context.Context, c models.Coordinate) (string, error) {
+	ex := executor.GetExecutor(ctx, repo.pool)
+
 	query := `INSERT INTO coordinates 
 		(entity_id, entity_type, address, latitude, longitude,
 		fare_amount, distance_km, duration_minutes, is_current)
@@ -27,7 +30,7 @@ func (repo *CordRepository) CreateNewCoordinate(ctx context.Context, c models.Co
 	RETURNING id`
 
 	var id string
-	err := repo.pool.QueryRow(
+	err := ex.QueryRow(
 		ctx, query,
 		c.EntityID, c.EntityType, c.Address,
 		c.Latitude, c.Longitude, c.FareAmount, c.DistanceKM, c.DurationMinutes, c.IsCurrent,
@@ -41,12 +44,14 @@ func (repo *CordRepository) CreateNewCoordinate(ctx context.Context, c models.Co
 }
 
 func (repo *CordRepository) GetCoordinate(ctx context.Context, id string) (models.Coordinate, error) {
+	ex := executor.GetExecutor(ctx, repo.pool)
+
 	query := `SELECT id, created_at, updated_at, entity_id, entity_type, address,
        latitude, longitude, fare_amount, distance_km, duration_minutes, is_current
 FROM coordinates
 WHERE id = $1
 `
-	row := repo.pool.QueryRow(ctx, query, id)
+	row := ex.QueryRow(ctx, query, id)
 	var coordinate models.Coordinate
 	err := row.Scan(
 		&coordinate.ID,
