@@ -28,7 +28,7 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	log := logger.New(cfg.Mode, false)
+	log := logger.New(cfg.Mode, true)
 
 	authSvc := initAuth(db, cfg, log)
 

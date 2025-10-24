@@ -26,8 +26,8 @@ func (repo *RideRepository) CreateNewRide(ctx context.Context, ride models.Ride)
 
 	query := `INSERT INTO rides (
 		ride_number, passenger_id, vehicle_type, status,
-		estimated_fare, pickup_coordinate_id
-	) VALUES ($1, $2, $3, $4, $5, $6,)
+		estimated_fare, pickup_coordinate_id, destination_coordinate_id
+	) VALUES ($1, $2, $3, $4, $5, $6, $7)
 	RETURNING id`
 
 	var id string
@@ -39,6 +39,7 @@ func (repo *RideRepository) CreateNewRide(ctx context.Context, ride models.Ride)
 		ride.Status,
 		ride.EstimatedFare,
 		ride.PickupCoordinateId,
+		ride.DestinationCoordinateId,
 	).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("failed to create ride: %w", err)

@@ -2,6 +2,7 @@ package txm
 
 import (
 	"context"
+	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"ride-hail/internal/core/domain/models"
 )
@@ -28,7 +29,9 @@ func (T *TXManager) Do(ctx context.Context, fn func(ctx context.Context) error) 
 	ctx = context.WithValue(ctx, models.GetTxKey(), tx)
 
 	if err = fn(ctx); err != nil {
-		_ = tx.Rollback(ctx)
+		if errR := tx.Rollback(ctx); errR != nil {
+			return fmt.Errorf("tx rollback: %w: %w", errR, err)
+		}
 		return err
 	}
 	return tx.Commit(ctx)
