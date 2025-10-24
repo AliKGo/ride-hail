@@ -2,14 +2,20 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"ride-hail/config"
 	"ride-hail/internal/adapters/http/handle"
 	"ride-hail/internal/adapters/http/server"
 	postgres2 "ride-hail/internal/adapters/postgres"
+	rabbit2 "ride-hail/internal/adapters/rabbit"
+	"ride-hail/internal/app/ride"
+	"ride-hail/internal/core/domain/types"
 	"ride-hail/internal/core/ports"
 	"ride-hail/internal/core/service"
 	"ride-hail/pkg/logger"
 	postgres "ride-hail/pkg/potgres"
+	"ride-hail/pkg/rabbit"
 )
 
 type Service interface {
@@ -23,18 +29,12 @@ type App struct {
 	log      *logger.Logger
 }
 
-func New(ctx context.Context, cfg config.Config) (*App, error) {
-	db, err := postgres.New(ctx, cfg.Database)
-	if err != nil {
-		return nil, err
-	}
-	log := logger.New(cfg.Mode, true)
+func New(cfg config.Config) (*App, error) {
 
-	authSvc := initAuth(db, cfg, log)
+	Svc := initService(cfg)
 
 	return &App{
 		authServ: authSvc,
-		log:      log,
 	}, nil
 }
 
@@ -45,11 +45,14 @@ func (app *App) Start() {
 	}
 }
 
-func initAuth(db *postgres.Postgres, cfg config.Config, log *logger.Logger) ports.AuthServices {
-	repo := postgres2.NewRepo(db.Pool)
-	authSvc := service.NewAuthService(cfg, repo, log)
-
-	h := handle.New(cfg, authSvc, log)
-
-	return server.New(h, cfg)
+func initService(cfg config.Config) (Service, error) {
+	switch cfg.Mode {
+	case types.ModeAdmin:
+	case types.ModeDAL:
+	case types.ModeRide:
+		ride.New(cfg)
+	default:
+		return nil, fmt.Errorf("unknown mode: %s", cfg.Mode)
+	}
+	return nil, nil
 }

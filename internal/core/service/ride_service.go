@@ -88,6 +88,8 @@ func (svc *RideService) CreateNewRide(ctx context.Context, r models.CreateRideRe
 		if err != nil {
 			return err
 		}
+
+		// нужно добавить rabbit
 		return nil
 	}
 
@@ -105,4 +107,8 @@ func (svc *RideService) CreateNewRide(ctx context.Context, r models.CreateRideRe
 		EstimatedDurationMinutes: minute,
 		EstimatedDistanceKm:      dist,
 	}, nil
+}
+
+func (svc *RideService) CloseRide(ctx context.Context, req models.CloseRideRequest) (models.CloseRideResponse, error) {
+	return models.CloseRideResponse{}, nil
 }

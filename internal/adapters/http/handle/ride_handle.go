@@ -24,6 +24,11 @@ func NewRideHandle(svc ports.RideService, log *logger.Logger) *RideHandle {
 	}
 }
 
+type RideHandler interface {
+	CreateNewRide(w http.ResponseWriter, r *http.Request)
+	CancelRide(w http.ResponseWriter, r *http.Request)
+}
+
 func (h *RideHandle) CreateNewRide(w http.ResponseWriter, r *http.Request) {
 	log := h.log.Func("RideHandle.CreateNewRide")
 	ctx := r.Context()

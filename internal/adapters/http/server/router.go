@@ -1,12 +1,26 @@
 package server
 
-import "net/http"
+import (
+	"ride-hail/internal/core/domain/types"
+)
 
-func (a *API) initRouterAuth() {
-	mux := http.NewServeMux()
+func (a *API) setupRoutes() {
+	a.setupDefaultRoutes()
 
-	mux.HandleFunc("POST /registration", a.h.Registration)
-	mux.HandleFunc("POST /login", a.h.Login)
+	switch a.cfg.Mode {
+	case types.ModeAdmin:
+	case types.ModeDAL:
+	case types.ModeRide:
+		a.setupRideRoutes()
+	}
 
-	a.mux = mux
+}
+func (a *API) setupDefaultRoutes() {
+	a.mux.HandleFunc("POST /registration", a.h.auth.Registration)
+	a.mux.HandleFunc("POST /login", a.h.auth.Login)
+}
+
+func (a *API) setupRideRoutes() {
+	a.mux.HandleFunc("/rides/", a.h.ride.CreateNewRide)
+	a.mux.HandleFunc("/rides/{ride_id}/cancel", a.h.ride.CancelRide)
 }

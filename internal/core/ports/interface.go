@@ -2,7 +2,6 @@ package ports
 
 import (
 	"context"
-	"net/http"
 	"ride-hail/internal/core/domain/models"
 )
 
@@ -11,11 +10,6 @@ type AuthServices interface {
 }
 
 // auth ports
-
-type AuthHandler interface {
-	Login(w http.ResponseWriter, r *http.Request)
-	Registration(w http.ResponseWriter, r *http.Request)
-}
 
 type AuthService interface {
 	CreateNewUser(ctx context.Context, user models.User) error
@@ -29,12 +23,8 @@ type UserRepository interface {
 
 //ride ports
 
-type RideHandler interface {
-	CreateNewRide(ctx context.Context, ride models.Ride) error
-}
-
 type RideService interface {
-	CreateNewRide(ctx context.Context, rideRequest models.CreateRideRequest) (models.CreateRideResponse, error)
+	CreateNewRide(ctx context.Context, r models.CreateRideRequest) (models.CreateRideResponse, error)
 	CloseRide(ctx context.Context, req models.CloseRideRequest) (models.CloseRideResponse, error)
 }
 
