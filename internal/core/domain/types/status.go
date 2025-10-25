@@ -14,3 +14,10 @@ var (
 	RideStatusCOMPLETED   = "COMPLETED"
 	RideStatusCANCELLED   = "CANCELLED"
 )
+
+var (
+	DriverStatusOffline   = "OFFLINE"
+	DriverStatusAvailable = "AVAILABLE"
+	DriverStatusBusy      = "BUSY"
+	DriverStatusEnRoute   = "EN_ROUTE"
+)

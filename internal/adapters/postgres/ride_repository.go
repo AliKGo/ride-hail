@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
 	"ride-hail/pkg/executor"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RideRepository struct {
@@ -84,7 +86,6 @@ func (repo *RideRepository) GetRide(ctx context.Context, id string) (models.Ride
 		&ride.PickupCoordinateId,
 		&ride.DestinationCoordinateId,
 	)
-
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.Ride{}, types.ErrRideNotFound
