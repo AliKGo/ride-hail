@@ -3,19 +3,12 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
+
 	"ride-hail/config"
-	"ride-hail/internal/adapters/http/handle"
-	"ride-hail/internal/adapters/http/server"
-	postgres2 "ride-hail/internal/adapters/postgres"
-	rabbit2 "ride-hail/internal/adapters/rabbit"
 	"ride-hail/internal/app/ride"
 	"ride-hail/internal/core/domain/types"
 	"ride-hail/internal/core/ports"
-	"ride-hail/internal/core/service"
 	"ride-hail/pkg/logger"
-	postgres "ride-hail/pkg/potgres"
-	"ride-hail/pkg/rabbit"
 )
 
 type Service interface {
@@ -29,12 +22,13 @@ type App struct {
 	log      *logger.Logger
 }
 
-func New(cfg config.Config) (*App, error) {
-
-	Svc := initService(cfg)
-
+func New(ctx context.Context, cfg config.Config) (*App, error) {
+	Svc, err := initService(ctx, cfg)
+	if err != nil {
+		return &App{}, nil
+	}
 	return &App{
-		authServ: authSvc,
+		authServ: Svc,
 	}, nil
 }
 
@@ -45,12 +39,12 @@ func (app *App) Start() {
 	}
 }
 
-func initService(cfg config.Config) (Service, error) {
+func initService(ctx context.Context, cfg config.Config) (Service, error) {
 	switch cfg.Mode {
 	case types.ModeAdmin:
 	case types.ModeDAL:
 	case types.ModeRide:
-		ride.New(cfg)
+		ride.New(ctx, cfg)
 	default:
 		return nil, fmt.Errorf("unknown mode: %s", cfg.Mode)
 	}
