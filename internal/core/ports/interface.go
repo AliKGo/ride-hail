@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"ride-hail/internal/core/domain/models"
 )
@@ -52,10 +53,9 @@ type DriverRepository interface {
 	GetDriverByID(ctx context.Context, id string) (*models.Driver, error)
 	UpdateDriver(ctx context.Context, driver models.Driver) error
 	DeleteDriver(ctx context.Context, id string) error
-	ListDriversByStatus(ctx context.Context, driver models.Driver) ([]models.Driver, error)
-	UpdateDriverStatus(ctx context.Context, driver models.Driver) (string, error)
+	ListDriversByStatus(ctx context.Context, status string, limit, offset int) ([]models.Driver, error)
+	UpdateDriverStatus(ctx context.Context, driverID string, newStatus string) error
 }
-
 type LocationService interface {
 	RecordDriverLocation(ctx context.Context, location models.LocationHistory) (string, error)
 	GetDriverLastLocation(ctx context.Context, driverID string) (*models.LocationHistory, error)
@@ -67,5 +67,5 @@ type LocationRepository interface {
 	SaveLocation(ctx context.Context, location models.LocationHistory) (string, error)
 	GetLastLocationByDriver(ctx context.Context, driverID string) (*models.LocationHistory, error)
 	GetLocationHistoryByDriver(ctx context.Context, driverID string, limit int) ([]models.LocationHistory, error)
-	DeleteLocationHistory(ctx context.Context, driverID string, before string) error
+	DeleteLocationHistory(ctx context.Context, driverID string, before time.Time) error
 }

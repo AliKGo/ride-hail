@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/pkg/executor"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CordRepository struct {
@@ -35,7 +37,6 @@ func (repo *CordRepository) CreateNewCoordinate(ctx context.Context, c models.Co
 		c.EntityID, c.EntityType, c.Address,
 		c.Latitude, c.Longitude, c.FareAmount, c.DistanceKM, c.DurationMinutes, c.IsCurrent,
 	).Scan(&id)
-
 	if err != nil {
 		return "", fmt.Errorf("failed to insert coordinate: %w", err)
 	}
@@ -71,7 +72,6 @@ WHERE id = $1
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.Coordinate{}, fmt.Errorf("failed to get coordinate by id %s: %w", id, err)
 		}
-
 	}
 
 	return coordinate, err

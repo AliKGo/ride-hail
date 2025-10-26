@@ -8,6 +8,4 @@ var (
 	ErrUserAlreadyExists = errors.New("user already exists")
 )
 
-var (
-	ErrRideNotFound = errors.New("ride not found")
-)
+var ErrRideNotFound = errors.New("ride not found")
