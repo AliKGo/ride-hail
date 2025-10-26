@@ -1,42 +1,68 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"ride-hail/config"
 	"ride-hail/internal/adapters/http/handle"
+	"ride-hail/internal/core/domain/action"
 	"ride-hail/internal/core/domain/types"
+	"ride-hail/pkg/logger"
 	"strconv"
 )
 
 type API struct {
 	h    *handlers
-	mux  *http.ServeMux
-	addr int
+	serv *http.Server
 	cfg  config.Config
+	log  *logger.Logger
+	addr int
 }
 
 type handlers struct {
-	auth *handle.Handle
-	ride *handle.RideHandle
+	auth handle.AuthHandle
+	ride handle.RideHandler
 }
 
-func New(authH *handle.Handle, cfg config.Config) *API {
+type Server interface {
+	Run()
+	Stop(ctx context.Context) error
+}
+
+func New(cfg config.Config, log *logger.Logger, auth handle.AuthHandle, ride handle.RideHandler) (*API, error) {
 	h := &handlers{
-		auth: authH,
+		auth: auth,
+		ride: ride,
 	}
 
 	api := &API{
 		h:   h,
 		cfg: cfg,
-		mux: http.NewServeMux(),
+		log: log,
 	}
+	mux := http.NewServeMux()
+	if err := api.setupRoutes(mux); err != nil {
+		return nil, err
+	}
+
 	api.initAddr()
-	api.setupRoutes()
-	return api
+	api.serv = &http.Server{
+		Addr:    ":" + strconv.Itoa(api.addr),
+		Handler: api.middleware(mux),
+	}
+
+	return api, nil
 }
 
-func (a *API) Run() error {
-	return http.ListenAndServe(":"+strconv.Itoa(a.addr), a.Middleware(a.mux))
+func (a *API) Run() {
+	log := a.log.Func("api.Run")
+	log.Info(context.Background(), action.StartApplication, "server starting", "addr", a.serv.Addr)
+
+	if err := a.serv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Error(context.Background(), action.StartApplication, "error in run server", "error", err)
+		return
+	}
+	log.Info(context.Background(), action.StartApplication, "server started")
 }
 
 func (a *API) initAddr() {
@@ -48,4 +74,10 @@ func (a *API) initAddr() {
 	case types.ModeRide:
 		a.addr = a.cfg.Services.RideService
 	}
+}
+
+func (a *API) Stop(ctx context.Context) error {
+	log := a.log.Func("api.Stop")
+	log.Info(ctx, action.StopApplication, "shutting down server")
+	return a.serv.Shutdown(ctx)
 }

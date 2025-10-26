@@ -5,6 +5,11 @@ var (
 	Login            = "login"
 	StartApplication = "start application"
 	StopApplication  = "stop application"
+	RequestInit      = "request init"
+)
+
+var (
+	Authorization = "authorization"
 )
 
 var (

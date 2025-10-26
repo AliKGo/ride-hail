@@ -20,6 +20,11 @@ type Handle struct {
 	expJWT int
 }
 
+type AuthHandle interface {
+	Registration(w http.ResponseWriter, r *http.Request)
+	Login(w http.ResponseWriter, r *http.Request)
+}
+
 func New(cfg config.Config, svc ports.AuthService, log *logger.Logger) *Handle {
 	dto.InitMode(cfg.Mode)
 	return &Handle{
@@ -120,6 +125,7 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 			"invalid JSON",
 			"error", err,
 		)
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 

@@ -1,26 +1,41 @@
 package server
 
 import (
+	"errors"
+	"net/http"
 	"ride-hail/internal/core/domain/types"
 )
 
-func (a *API) setupRoutes() {
-	a.setupDefaultRoutes()
+func (a *API) setupRoutes(mux *http.ServeMux) error {
+	if err := a.setupDefaultRoutes(mux); err != nil {
+		return err
+	}
 
 	switch a.cfg.Mode {
 	case types.ModeAdmin:
 	case types.ModeDAL:
 	case types.ModeRide:
-		a.setupRideRoutes()
+		if err := a.setupRideRoutes(mux); err != nil {
+			return err
+		}
 	}
-
-}
-func (a *API) setupDefaultRoutes() {
-	a.mux.HandleFunc("POST /registration", a.h.auth.Registration)
-	a.mux.HandleFunc("POST /login", a.h.auth.Login)
+	return nil
 }
 
-func (a *API) setupRideRoutes() {
-	a.mux.HandleFunc("/rides/", a.h.ride.CreateNewRide)
-	a.mux.HandleFunc("/rides/{ride_id}/cancel", a.h.ride.CancelRide)
+func (a *API) setupDefaultRoutes(mux *http.ServeMux) error {
+	if a.h.auth == nil {
+		return errors.New("authorization service is request")
+	}
+	mux.HandleFunc("POST /registration", a.h.auth.Registration)
+	mux.HandleFunc("POST /login", a.h.auth.Login)
+	return nil
+}
+
+func (a *API) setupRideRoutes(mux *http.ServeMux) error {
+	if a.h.ride == nil {
+		return errors.New("ride service is required")
+	}
+	mux.HandleFunc("/rides/", a.jwtMiddleware(a.h.ride.CreateNewRide))
+	mux.HandleFunc("/rides/{ride_id}/cancel", a.jwtMiddleware(a.h.ride.CancelRide))
+	return nil
 }
