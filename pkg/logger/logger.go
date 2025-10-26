@@ -7,40 +7,43 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"ride-hail/internal/core/domain/models"
+	"sync"
 	"time"
 )
 
-// уровни логов (по желанию)
+// Ключи контекста
+type contextKey string
+
 const (
-	LevelDebug = "DEBUG"
-	LevelInfo  = "INFO"
-	LevelWarn  = "WARN"
-	LevelError = "ERROR"
+	RequestIDKey contextKey = "request_id"
+	UserIDKey    contextKey = "user_id"
+	RoleKey      contextKey = "role"
 )
 
-// Logger — основной логгер, создаётся на уровне сервиса
+// Logger — основной логгер
 type Logger struct {
 	service  string
 	hostname string
 	slog     *slog.Logger
 }
 
-// New создает новый логгер.
-// pretty=true → красиво в консоли (dev)
-// pretty=false → компактный JSON (prod)
-func New(service string, pretty bool) *Logger {
+// NewLogger создаёт новый логгер с опциями
+func NewLogger(service string, opts LoggerOptions) *Logger {
+	if opts.Output == nil {
+		opts.Output = os.Stdout
+	}
+
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown-host"
 	}
 
 	var handler slog.Handler
-	if pretty {
-		handler = NewPrettyJSONHandler(os.Stdout, slog.LevelDebug)
+	if opts.Pretty {
+		handler = NewPrettyJSONHandler(opts.Output, opts.Level)
 	} else {
-		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
+		handler = slog.NewJSONHandler(opts.Output, &slog.HandlerOptions{
+			Level: opts.Level,
 		})
 	}
 
@@ -51,7 +54,13 @@ func New(service string, pretty bool) *Logger {
 	}
 }
 
-// Func создаёт логгер для конкретной функции (или метода)
+type LoggerOptions struct {
+	Output io.Writer
+	Pretty bool
+	Level  slog.Level
+}
+
+// Func создаёт логгер функции
 func (l *Logger) Func(prefix string) *FuncLogger {
 	return &FuncLogger{
 		service:  l.service,
@@ -70,6 +79,15 @@ type FuncLogger struct {
 }
 
 func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message string, fields ...interface{}) {
+	if len(fields)%2 != 0 {
+		// Логируем предупреждение о нечётном количестве аргументов
+		f.slog.Warn("odd number of fields provided to logger",
+			slog.String("func", f.prefix),
+			slog.Int("fields_count", len(fields)),
+		)
+		fields = fields[:len(fields)-1] // Удаляем последний элемент
+	}
+
 	reqID := GetRequestID(ctx)
 	userID := GetUserID(ctx)
 
@@ -88,7 +106,8 @@ func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message 
 		attrs = append(attrs, slog.String("user_id", userID))
 	}
 
-	for i := 0; i < len(fields)-1; i += 2 {
+	// Безопасная итерация по полям
+	for i := 0; i < len(fields); i += 2 {
 		key, ok := fields[i].(string)
 		if !ok {
 			continue
@@ -99,27 +118,29 @@ func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message 
 	f.slog.LogAttrs(ctx, level, message, attrs...)
 }
 
-// Методы уровней логирования
 func (f *FuncLogger) Debug(ctx context.Context, action, message string, fields ...interface{}) {
 	f.log(ctx, slog.LevelDebug, action, message, fields...)
 }
+
 func (f *FuncLogger) Info(ctx context.Context, action, message string, fields ...interface{}) {
 	f.log(ctx, slog.LevelInfo, action, message, fields...)
 }
+
 func (f *FuncLogger) Warn(ctx context.Context, action, message string, fields ...interface{}) {
 	f.log(ctx, slog.LevelWarn, action, message, fields...)
 }
+
 func (f *FuncLogger) Error(ctx context.Context, action, message string, fields ...interface{}) {
 	f.log(ctx, slog.LevelError, action, message, fields...)
 }
 
-// контекст для request_id
+// Функции для работы с контекстом
 func WithRequestID(ctx context.Context, requestID string) context.Context {
-	return context.WithValue(ctx, models.GetRequestIDKey(), requestID)
+	return context.WithValue(ctx, RequestIDKey, requestID)
 }
 
 func GetRequestID(ctx context.Context) string {
-	if v := ctx.Value(models.GetRequestIDKey()); v != nil {
+	if v := ctx.Value(RequestIDKey); v != nil {
 		if id, ok := v.(string); ok {
 			return id
 		}
@@ -128,11 +149,11 @@ func GetRequestID(ctx context.Context) string {
 }
 
 func WithUserID(ctx context.Context, userID string) context.Context {
-	return context.WithValue(ctx, models.GetUserIDKey(), userID)
+	return context.WithValue(ctx, UserIDKey, userID)
 }
 
 func GetUserID(ctx context.Context) string {
-	if v := ctx.Value(models.GetUserIDKey()); v != nil {
+	if v := ctx.Value(UserIDKey); v != nil {
 		if id, ok := v.(string); ok {
 			return id
 		}
@@ -141,11 +162,11 @@ func GetUserID(ctx context.Context) string {
 }
 
 func WithRole(ctx context.Context, role string) context.Context {
-	return context.WithValue(ctx, models.GetRoleKey(), role)
+	return context.WithValue(ctx, RoleKey, role)
 }
 
 func GetRole(ctx context.Context) string {
-	if v := ctx.Value(models.GetRoleKey()); v != nil {
+	if v := ctx.Value(RoleKey); v != nil {
 		if r, ok := v.(string); ok {
 			return r
 		}
@@ -154,12 +175,13 @@ func GetRole(ctx context.Context) string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// PRETTY JSON HANDLER — красивый вывод JSON для dev
+// PRETTY JSON HANDLER
 ////////////////////////////////////////////////////////////////////////////////
 
 type PrettyJSONHandler struct {
 	out   io.Writer
 	level slog.Leveler
+	mu    sync.Mutex // Потокобезопасность
 }
 
 func NewPrettyJSONHandler(out io.Writer, level slog.Leveler) *PrettyJSONHandler {
@@ -171,6 +193,9 @@ func (h *PrettyJSONHandler) Enabled(_ context.Context, lvl slog.Level) bool {
 }
 
 func (h *PrettyJSONHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	data := make(map[string]interface{})
 	data["time"] = r.Time.Format(time.RFC3339)
 	data["level"] = r.Level.String()
@@ -185,8 +210,11 @@ func (h *PrettyJSONHandler) Handle(_ context.Context, r slog.Record) error {
 	enc := json.NewEncoder(&buf)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(data); err != nil {
+		// Логируем в stderr, чтобы не потерять ошибку
+		_, _ = io.WriteString(os.Stderr, "logger error: "+err.Error()+"\n")
 		return err
 	}
+
 	_, err := h.out.Write(buf.Bytes())
 	return err
 }

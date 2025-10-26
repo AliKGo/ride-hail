@@ -3,40 +3,32 @@ package app
 import (
 	"context"
 	"fmt"
-
 	"ride-hail/config"
 	"ride-hail/internal/app/ride"
 	"ride-hail/internal/core/domain/types"
-	"ride-hail/internal/core/ports"
-	"ride-hail/pkg/logger"
 )
 
 type Service interface {
-	Run() error
-	Stop()
+	Run()
+	Stop(ctx context.Context) error
 }
 
 type App struct {
-	svc      Service
-	authServ ports.AuthServices
-	log      *logger.Logger
+	svc Service
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
-	Svc, err := initService(ctx, cfg)
+	svc, err := initService(ctx, cfg)
 	if err != nil {
 		return &App{}, nil
 	}
 	return &App{
-		authServ: Svc,
+		svc: svc,
 	}, nil
 }
 
 func (app *App) Start() {
-	err := app.authServ.Run()
-	if err != nil {
-		return
-	}
+	app.svc.Run()
 }
 
 func initService(ctx context.Context, cfg config.Config) (Service, error) {
@@ -44,7 +36,7 @@ func initService(ctx context.Context, cfg config.Config) (Service, error) {
 	case types.ModeAdmin:
 	case types.ModeDAL:
 	case types.ModeRide:
-		ride.New(ctx, cfg)
+		return ride.New(ctx, cfg)
 	default:
 		return nil, fmt.Errorf("unknown mode: %s", cfg.Mode)
 	}
