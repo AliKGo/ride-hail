@@ -2,10 +2,11 @@ package server
 
 import (
 	"net/http"
+	"strconv"
+
 	"ride-hail/config"
 	"ride-hail/internal/adapters/http/handle"
 	"ride-hail/internal/core/domain/types"
-	"strconv"
 )
 
 type API struct {
@@ -18,6 +19,7 @@ type API struct {
 type handlers struct {
 	auth *handle.Handle
 	ride *handle.RideHandle
+	dal  *handle.DalHandle
 }
 
 func New(authH *handle.Handle, cfg config.Config) *API {

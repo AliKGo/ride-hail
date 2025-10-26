@@ -40,14 +40,6 @@ type CoordinatesRepository interface {
 }
 
 // dal ports
-type DriverService interface {
-	ChangeDriverStatus(ctx context.Context, driverID string, driver models.Driver) error
-	RegisterDriver(ctx context.Context, driver models.Driver) (string, error)
-	GetDriverProfile(ctx context.Context, driverID string) (*models.Driver, error)
-	UpdateDriverProfile(ctx context.Context, driver models.Driver) error
-	ListAvailableDrivers(ctx context.Context) ([]models.Driver, error)
-}
-
 type DriverRepository interface {
 	CreateDriver(ctx context.Context, driver models.Driver) (string, error)
 	GetDriverByID(ctx context.Context, id string) (*models.Driver, error)
@@ -56,16 +48,29 @@ type DriverRepository interface {
 	ListDriversByStatus(ctx context.Context, status string, limit, offset int) ([]models.Driver, error)
 	UpdateDriverStatus(ctx context.Context, driverID string, newStatus string) error
 }
-type LocationService interface {
-	RecordDriverLocation(ctx context.Context, location models.LocationHistory) (string, error)
-	GetDriverLastLocation(ctx context.Context, driverID string) (*models.LocationHistory, error)
-	GetDriverLocationHistory(ctx context.Context, driverID string, limit int) ([]models.LocationHistory, error)
-	ClearOldLocations(ctx context.Context, driverID string, before string) error
-}
 
 type LocationRepository interface {
 	SaveLocation(ctx context.Context, location models.LocationHistory) (string, error)
 	GetLastLocationByDriver(ctx context.Context, driverID string) (*models.LocationHistory, error)
 	GetLocationHistoryByDriver(ctx context.Context, driverID string, limit int) ([]models.LocationHistory, error)
 	DeleteLocationHistory(ctx context.Context, driverID string, before time.Time) error
+}
+
+type DalService interface {
+	RegisterDriver(ctx context.Context, driver models.Driver) (string, error)
+	GetDriverProfile(ctx context.Context, driverID string) (*models.Driver, error)
+	UpdateDriverProfile(ctx context.Context, driver models.Driver) error
+	DeleteDriver(ctx context.Context, driverID string) error
+
+	ChangeDriverStatus(ctx context.Context, driverID string, newStatus string, expectedStatus string) error
+	ListAvailableDriversNear(ctx context.Context, lat float64, lng float64, radiusMeters int, vehicleType *string, limit int, offset int) ([]models.Driver, error)
+	RecordDriverLocation(ctx context.Context, location models.LocationHistory) (string, error)
+
+	GetDriverLastLocation(ctx context.Context, driverID string) (*models.LocationHistory, error)
+	GetDriverLocationHistory(ctx context.Context, driverID string, limit int) ([]models.LocationHistory, error)
+
+	ClearOldLocations(ctx context.Context, driverID string, before time.Time) error
+
+	StartDriverSession(ctx context.Context, driverID string) (string, error)
+	EndDriverSession(ctx context.Context, sessionID string) error
 }
