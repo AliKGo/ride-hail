@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
 	"ride-hail/pkg/executor"
@@ -94,4 +93,22 @@ func (repo *RideRepository) GetRide(ctx context.Context, id string) (models.Ride
 	}
 
 	return ride, nil
+}
+
+func (repo *RideRepository) GenerateRideNumber(ctx context.Context) (int, error) {
+	ex := executor.GetExecutor(ctx, repo.pool)
+	var counter int
+	err := ex.QueryRow(ctx,
+		`
+        INSERT INTO ride_counters (ride_date, counter) 
+        VALUES (CURRENT_DATE, 1)
+        ON CONFLICT (ride_date) DO UPDATE
+        SET counter = ride_counters.counter + 1
+        RETURNING counter
+    `).Scan(&counter)
+	
+	if err != nil {
+		return 0, err
+	}
+	return counter, nil
 }

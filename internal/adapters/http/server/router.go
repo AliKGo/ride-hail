@@ -39,7 +39,7 @@ func (a *API) setupRideRoutes(mux *http.ServeMux) error {
 	if a.h.ride == nil {
 		return errors.New("ride service is required")
 	}
-	mux.HandleFunc("/rides/", a.jwtMiddleware(a.h.ride.CreateNewRide))
+	mux.HandleFunc("/rides", a.jwtMiddleware(a.h.ride.CreateNewRide))
 	mux.HandleFunc("/rides/{ride_id}/cancel", a.jwtMiddleware(a.h.ride.CancelRide))
 	return nil
 }

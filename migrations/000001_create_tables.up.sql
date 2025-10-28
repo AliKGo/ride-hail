@@ -128,6 +128,12 @@ create table ride_events (
                              event_data jsonb not null
 );
 
+CREATE TABLE ride_counters (
+                            ride_date DATE PRIMARY KEY,
+                            counter INT NOT NULL
+);
+
+
 /*
 Example event_data field:
 {

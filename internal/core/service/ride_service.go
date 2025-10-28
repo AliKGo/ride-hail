@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"ride-hail/internal/core/domain/action"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
@@ -9,12 +11,18 @@ import (
 	"ride-hail/internal/core/service/calculator"
 	"ride-hail/pkg/logger"
 	"ride-hail/pkg/txm"
+	"time"
 )
 
 type RideService struct {
-	log  *logger.Logger
-	repo Repository
-	txm  txm.Manager
+	log       *logger.Logger
+	repo      Repository
+	txm       txm.Manager
+	msgBroker MsgBroker
+}
+
+type MsgBroker struct {
+	publisher ports.RidePublisher
 }
 
 type Repository struct {
@@ -22,7 +30,7 @@ type Repository struct {
 	cord ports.CoordinatesRepository
 }
 
-func NewRideService(log *logger.Logger, txm txm.Manager, rideRepo ports.RideRepository, cordRepo ports.CoordinatesRepository) *RideService {
+func NewRideService(log *logger.Logger, txm txm.Manager, rideRepo ports.RideRepository, cordRepo ports.CoordinatesRepository, rPub ports.RidePublisher) *RideService {
 	return &RideService{
 		log: log,
 		txm: txm,
@@ -30,12 +38,20 @@ func NewRideService(log *logger.Logger, txm txm.Manager, rideRepo ports.RideRepo
 			ride: rideRepo,
 			cord: cordRepo,
 		},
+		msgBroker: MsgBroker{
+			publisher: rPub,
+		},
 	}
 }
 
+const exchangeName = "ride_topic"
+
+var (
+	queueRideRequests = "ride_requests"
+)
+
 func (svc *RideService) CreateNewRide(ctx context.Context, r models.CreateRideRequest) (models.CreateRideResponse, error) {
-	log := svc.log.Func("RideHandle.CreateNewRide")
-	var rideID string
+	log := svc.log.Func("RideService.CreateNewRide")
 
 	dist := calculator.Distance(r.PickupLatitude, r.PickupLongitude, r.DestinationLatitude, r.DestinationLongitude)
 	minute := calculator.Duration(dist)
@@ -45,8 +61,15 @@ func (svc *RideService) CreateNewRide(ctx context.Context, r models.CreateRideRe
 		return models.CreateRideResponse{}, err
 	}
 
+	newRide := models.Ride{
+		PassengerID:   logger.GetUserID(ctx),
+		VehicleType:   r.RideType,
+		Status:        types.RideStatusREQUESTED,
+		EstimatedFare: fareAmount,
+	}
+
 	fn := func(ctx context.Context) error {
-		pickupID, err := svc.repo.cord.CreateNewCoordinate(ctx, models.Coordinate{
+		if newRide.PickupCoordinateId, err = svc.repo.cord.CreateNewCoordinate(ctx, models.Coordinate{
 			EntityID:        logger.GetUserID(ctx),
 			EntityType:      types.EntityRolePassenger,
 			Address:         r.PickupAddress,
@@ -56,12 +79,12 @@ func (svc *RideService) CreateNewRide(ctx context.Context, r models.CreateRideRe
 			DurationMinutes: minute,
 			DistanceKM:      dist,
 			IsCurrent:       true,
-		})
-		if err != nil {
+		}); err != nil {
+			log.Error(ctx, action.CreateRide, "error creating new coordinate", "error", err)
 			return err
 		}
 
-		destinationID, err := svc.repo.cord.CreateNewCoordinate(ctx, models.Coordinate{
+		if newRide.DestinationCoordinateId, err = svc.repo.cord.CreateNewCoordinate(ctx, models.Coordinate{
 			EntityID:        logger.GetUserID(ctx),
 			EntityType:      types.EntityRolePassenger,
 			Address:         r.DestinationAddress,
@@ -71,37 +94,41 @@ func (svc *RideService) CreateNewRide(ctx context.Context, r models.CreateRideRe
 			DurationMinutes: minute,
 			DistanceKM:      dist,
 			IsCurrent:       true,
-		})
-		if err != nil {
+		}); err != nil {
+			log.Error(ctx, action.CreateRide, "error creating new coordinate", "error", err)
 			return err
 		}
 
-		rideID, err = svc.repo.ride.CreateNewRide(ctx, models.Ride{
-			RideNumber:              "",
-			PassengerID:             logger.GetUserID(ctx),
-			VehicleType:             r.RideType,
-			Status:                  types.RideStatusREQUESTED,
-			EstimatedFare:           fareAmount,
-			PickupCoordinateId:      pickupID,
-			DestinationCoordinateId: destinationID,
-		})
+		if rNumber, err := svc.repo.ride.GenerateRideNumber(ctx); err != nil {
+			log.Error(ctx, action.CreateRide, "error generating ride number", "error", err)
+			return err
+		} else {
+			newRide.RideNumber = fmt.Sprintf("RIDE_%s_%03d", time.Now().Format("20060102"), rNumber)
+		}
+
+		newRide.ID, err = svc.repo.ride.CreateNewRide(ctx, newRide)
 		if err != nil {
+			log.Error(ctx, action.CreateRide, "error creating new ride", "error", err)
 			return err
 		}
 
-		// нужно добавить rabbit
+		if data, err := json.Marshal(newRide); err != nil {
+			log.Error(ctx, action.CreateRide, "error marshalling new ride", "error", err)
+			return err
+		} else if err = svc.msgBroker.publisher.Publish(exchangeName, queueRideRequests, data); err != nil {
+			log.Error(ctx, action.CreateRide, "error publishing ride", "error", err)
+		}
+
 		return nil
 	}
 
-	err = svc.txm.Do(ctx, fn)
-	if err != nil {
-		log.Error(ctx, action.CreateRide, "error in saved data", "error", err)
+	if err = svc.txm.Do(ctx, fn); err != nil {
 		return models.CreateRideResponse{}, err
 	}
 
 	return models.CreateRideResponse{
-		RideID:                   rideID,
-		RideNumber:               "",
+		RideID:                   newRide.ID,
+		RideNumber:               newRide.RideNumber,
 		Status:                   types.RideStatusREQUESTED,
 		EstimatedFare:            fareAmount,
 		EstimatedDurationMinutes: minute,

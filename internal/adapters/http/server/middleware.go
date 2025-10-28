@@ -14,14 +14,9 @@ import (
 
 func (a *API) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log := a.log.Func("api.middleware")
-
 		reqID := r.Header.Get("X-Request-ID")
 		if reqID == "" {
 			reqID = newRequestID()
-			log.Debug(r.Context(), action.RequestInit, "generated new request id", "request_id", reqID)
-		} else {
-			log.Debug(r.Context(), action.RequestInit, "using request id from header", "request_id", reqID)
 		}
 
 		w.Header().Set("X-Request-ID", reqID)

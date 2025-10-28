@@ -29,9 +29,14 @@ type RideService interface {
 	CloseRide(ctx context.Context, req models.CloseRideRequest) (models.CloseRideResponse, error)
 }
 
+type RidePublisher interface {
+	Publish(exName, queue string, message []byte) error
+}
+
 type RideRepository interface {
 	CreateNewRide(ctx context.Context, ride models.Ride) (string, error)
 	GetRide(ctx context.Context, id string) (models.Ride, error)
+	GenerateRideNumber(ctx context.Context) (int, error)
 }
 
 type CoordinatesRepository interface {

@@ -2,7 +2,6 @@ package handle
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"ride-hail/internal/adapters/http/handle/dto"
 	"ride-hail/internal/core/domain/action"
@@ -37,16 +36,14 @@ func (h *RideHandle) CreateNewRide(w http.ResponseWriter, r *http.Request) {
 	log.Debug(ctx, action.CreateRide, "request to create a Ride has been launched")
 
 	if logger.GetRole(ctx) != types.RoleCustomer {
-		log.Error(ctx, action.CreateRide, "invalid role")
+		log.Error(ctx, action.CreateRide, "invalid role", "role", logger.GetRole(ctx))
 		http.Error(w, msgForbidden, http.StatusForbidden)
 		return
 	}
 	var rideDto models.CreateRideRequest
 
-	body, _ := io.ReadAll(r.Body)
-	log.Info(ctx, action.CreateRide, "parsing body", "body", string(body))
-	if err := json.Unmarshal(body, &rideDto); err != nil {
-		log.Error(ctx, "decode error", "error", err)
+	if err := json.NewDecoder(r.Body).Decode(&rideDto); err != nil {
+		log.Error(ctx, "decode error", "msg", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

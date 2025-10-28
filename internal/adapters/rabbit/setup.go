@@ -1,10 +1,15 @@
 package rabbit
 
 import (
+	"errors"
 	"ride-hail/pkg/rabbit"
 )
 
 func InitRabbitTopology(r *rabbit.Rabbit) error {
+	if r.Conn.IsClosed() {
+		return errors.New("connection is closed")
+	}
+
 	exchanges := []struct {
 		Name string
 		Type string
@@ -33,13 +38,13 @@ func InitRabbitTopology(r *rabbit.Rabbit) error {
 		{"location_updates_ride", ""},
 	}
 
-	if err := r.SetupExchangesAndQueues("ride_topic", "topic", rideQueues); err != nil {
+	if err := r.SetupExchangesAndQueues(exchanges[0].Name, exchanges[0].Type, rideQueues); err != nil {
 		return err
 	}
-	if err := r.SetupExchangesAndQueues("driver_topic", "topic", driverQueues); err != nil {
+	if err := r.SetupExchangesAndQueues(exchanges[1].Name, exchanges[1].Type, driverQueues); err != nil {
 		return err
 	}
-	if err := r.SetupExchangesAndQueues("location_fanout", "fanout", locationQueues); err != nil {
+	if err := r.SetupExchangesAndQueues(exchanges[2].Name, exchanges[2].Type, locationQueues); err != nil {
 		return err
 	}
 

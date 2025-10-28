@@ -20,7 +20,7 @@ type App struct {
 func New(ctx context.Context, cfg config.Config) (*App, error) {
 	svc, err := initService(ctx, cfg)
 	if err != nil {
-		return &App{}, nil
+		return &App{}, err
 	}
 	return &App{
 		svc: svc,

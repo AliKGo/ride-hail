@@ -3,14 +3,14 @@ package models
 import "time"
 
 type CreateRideRequest struct {
-	PassengerID          string
-	PickupLatitude       float64
-	PickupLongitude      float64
-	PickupAddress        string
-	DestinationLatitude  float64
-	DestinationLongitude float64
-	DestinationAddress   string
-	RideType             string
+	PassengerID          string  `json:"passenger_id"`
+	PickupLatitude       float64 `json:"pickup_latitude"`
+	PickupLongitude      float64 `json:"pickup_longitude"`
+	PickupAddress        string  `json:"pickup_address"`
+	DestinationLatitude  float64 `json:"destination_latitude"`
+	DestinationLongitude float64 `json:"destination_longitude"`
+	DestinationAddress   string  `json:"destination_address"`
+	RideType             string  `json:"ride_type"`
 }
 
 type Ride struct {

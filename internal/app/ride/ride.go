@@ -6,8 +6,10 @@ import (
 	"ride-hail/internal/adapters/http/handle"
 	"ride-hail/internal/adapters/http/server"
 	"ride-hail/internal/adapters/postgres"
+	"ride-hail/internal/adapters/rabbit"
 	"ride-hail/internal/core/service"
 	"ride-hail/pkg/logger"
+	rb "ride-hail/pkg/rabbit"
 	"ride-hail/pkg/txm"
 
 	"ride-hail/config"
@@ -34,10 +36,21 @@ func New(ctx context.Context, cfg config.Config) (*RideService, error) {
 	cRepo := postgres.NewCordRepository(pg.Pool)
 	rRepo := postgres.NewRideRepository(pg.Pool)
 
+	rb, err := rb.New(cfg.RabbitMQ)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = rabbit.InitRabbitTopology(rb); err != nil {
+		return nil, err
+	}
+
+	rPub := rabbit.NewRidePublisher(rb.Conn)
+
 	tmx := txm.NewTXManager(pg.Pool)
 
 	authServ := service.NewAuthService(cfg, uRepo, log)
-	rideServ := service.NewRideService(log, tmx, rRepo, cRepo)
+	rideServ := service.NewRideService(log, tmx, rRepo, cRepo, rPub)
 
 	authHandle := handle.New(cfg, authServ, log)
 	rideHandle := handle.NewRideHandle(rideServ, log)

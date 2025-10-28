@@ -6,8 +6,8 @@ import (
 )
 
 type Rabbit struct {
-	conn *amqp.Connection
-	cfg  Config
+	Conn *amqp.Connection
+	Cfg  Config
 }
 
 type Config struct {
@@ -32,12 +32,12 @@ func New(cfg Config) (*Rabbit, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rabbit{conn: conn, cfg: cfg}, nil
+	return &Rabbit{Conn: conn, Cfg: cfg}, nil
 }
 
 func (r *Rabbit) Close() {
-	if r.conn != nil {
-		_ = r.conn.Close()
+	if r.Conn != nil {
+		_ = r.Conn.Close()
 	}
 }
 
@@ -47,7 +47,7 @@ type QueueConfig struct {
 }
 
 func (r *Rabbit) SetupExchangesAndQueues(exchangeName, exchangeType string, queues []QueueConfig) error {
-	ch, err := r.conn.Channel()
+	ch, err := r.Conn.Channel()
 	if err != nil {
 		return err
 	}
@@ -78,22 +78,9 @@ func (r *Rabbit) SetupExchangesAndQueues(exchangeName, exchangeType string, queu
 }
 
 func (r *Rabbit) ensureExchange(ch *amqp.Channel, name, kind string) error {
-	if err := ch.ExchangeDeclarePassive(name, kind, true, false, false, false, nil); err == nil {
-		return nil
-	}
-
 	return ch.ExchangeDeclare(name, kind, true, false, false, false, nil)
 }
 
 func (r *Rabbit) ensureQueue(ch *amqp.Channel, name string) (amqp.Queue, error) {
-	_, err := ch.QueueDeclarePassive(name, true, false, false, false, nil)
-	if err == nil {
-		return amqp.Queue{Name: name}, nil
-	}
-
-	q, err := ch.QueueDeclare(name, true, false, false, false, nil)
-	if err != nil {
-		return amqp.Queue{}, err
-	}
-	return q, nil
+	return ch.QueueDeclare(name, true, false, false, false, nil)
 }
