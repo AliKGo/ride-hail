@@ -24,7 +24,7 @@ func Run() {
 	ctx, _ := context.WithCancel(context.Background())
 	app, err := app.New(ctx, *cfg)
 	if err != nil {
-		slog.Error("error in creating app", err.Error())
+		slog.Error("error in creating app", err)
 		//cansel()
 		return
 	}

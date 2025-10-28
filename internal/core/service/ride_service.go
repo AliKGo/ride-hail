@@ -112,7 +112,43 @@ func (svc *RideService) CreateNewRide(ctx context.Context, r models.CreateRideRe
 			return err
 		}
 
-		if data, err := json.Marshal(newRide); err != nil {
+		if data, err := json.Marshal(struct {
+			RideID         string `json:"ride_id"`
+			RideNumber     string `json:"ride_number"`
+			PickupLocation struct {
+				Lat     float64 `json:"lat"`
+				Lng     float64 `json:"lon"`
+				Address string  `json:"address"`
+			} `json:"pickup_location"`
+			DestinationLocation struct {
+				Lat     float64 `json:"lat"`
+				Lng     float64 `json:"lng"`
+				Address string  `json:"address"`
+			}
+			RideType       string  `json:"ride_type"`
+			EstimatedFare  float64 `json:"estimated_fare"`
+			MaxDistanceKM  float64 `json:"max_distance_km"`
+			TimeoutSeconds int     `json:"timeout_seconds"`
+			CorrelationID  string  `json:"correlation_id"`
+		}{
+			RideID:     newRide.ID,
+			RideNumber: newRide.RideNumber,
+			PickupLocation: struct {
+				Lat     float64 `json:"lat"`
+				Lng     float64 `json:"lon"`
+				Address string  `json:"address"`
+			}{Lat: r.PickupLatitude, Lng: r.PickupLongitude, Address: r.PickupAddress},
+			DestinationLocation: struct {
+				Lat     float64 `json:"lat"`
+				Lng     float64 `json:"lng"`
+				Address string  `json:"address"`
+			}{Lat: r.DestinationLatitude, Lng: r.DestinationLongitude, Address: r.DestinationAddress},
+			RideType:       r.RideType,
+			EstimatedFare:  fareAmount,
+			MaxDistanceKM:  dist,
+			TimeoutSeconds: 30,
+			CorrelationID:  logger.GetRequestID(ctx),
+		}); err != nil {
 			log.Error(ctx, action.CreateRide, "error marshalling new ride", "error", err)
 			return err
 		} else if err = svc.msgBroker.publisher.Publish(exchangeName, queueRideRequests, data); err != nil {
