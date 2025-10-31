@@ -2,7 +2,6 @@ package ride
 
 import (
 	"context"
-	"log/slog"
 	"ride-hail/internal/adapters/http/handle"
 	"ride-hail/internal/adapters/http/server"
 	"ride-hail/internal/adapters/http/websocket"
@@ -19,17 +18,14 @@ import (
 )
 
 type RideService struct {
-	server server.Server
-	svc    ports.RideService
+	server     server.Server
+	svc        ports.RideService
+	wsm        *websocket.PassengerWebSocketManager
+	cancelFunc context.CancelFunc
+	cancel     context.Context
 }
 
-func New(ctx context.Context, cfg config.Config) (*RideService, error) {
-	log := logger.NewLogger(
-		cfg.Mode, logger.Options{
-			Pretty: true,
-			Level:  slog.LevelDebug,
-		},
-	)
+func New(ctx context.Context, log *logger.Logger, cfg config.Config) (*RideService, error) {
 	pg, err := pg.New(ctx, cfg.Database)
 	if err != nil {
 		return nil, err
@@ -69,18 +65,29 @@ func New(ctx context.Context, cfg config.Config) (*RideService, error) {
 		return nil, err
 	}
 
+	cancel, cancelFunc := context.WithCancel(context.Background())
+
 	return &RideService{
-		server: serv,
-		svc:    rideServ,
+		server:     serv,
+		svc:        rideServ,
+		wsm:        wsm,
+		cancel:     cancel,
+		cancelFunc: cancelFunc,
 	}, nil
 }
 
 func (r *RideService) Run(ctx context.Context) {
-	go r.svc.StartService(ctx)
+	go r.svc.StartService(r.cancel)
 	go r.server.Run()
-
 }
 
 func (r *RideService) Stop(ctx context.Context) error {
-	return r.server.Stop(ctx)
+	r.cancelFunc()
+
+	r.wsm.Shutdown()
+
+	if err := r.server.Stop(ctx); err != nil {
+		return err
+	}
+	return nil
 }
