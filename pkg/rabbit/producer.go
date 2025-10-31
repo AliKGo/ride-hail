@@ -7,18 +7,18 @@ import (
 	"sync"
 )
 
-type Publisher struct {
+type Producer struct {
 	conn  *amqp.Connection
 	mutex sync.Mutex
 }
 
-func NewRidePublisher(conn *amqp.Connection) *Publisher {
-	return &Publisher{
+func NewPublisher(conn *amqp.Connection) *Producer {
+	return &Producer{
 		conn: conn,
 	}
 }
 
-func (p *Publisher) Publish(exName, queue string, message []byte) error {
+func (p *Producer) Producer(exName, queue string, message []byte) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -23,7 +24,6 @@ type API struct {
 type handlers struct {
 	auth handle.AuthHandle
 	ride handle.RideHandler
-	dal  handle.DalHandler
 }
 
 type Server interface {
@@ -59,8 +59,7 @@ func New(cfg config.Config, log *logger.Logger, auth handle.AuthHandle, ride han
 func (a *API) Run() {
 	log := a.log.Func("api.Run")
 	log.Info(context.Background(), action.StartApplication, "server starting", "addr", a.serv.Addr)
-
-	if err := a.serv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := a.serv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Error(context.Background(), action.StartApplication, "error in run server", "error", err)
 		return
 	}

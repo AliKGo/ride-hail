@@ -33,23 +33,23 @@ func NewAuthService(cfg config.Config, repo ports.UserRepository, log *logger.Lo
 }
 
 // Login returning token and error
-func (s *AuthService) Login(ctx context.Context, user models.User) (string, error) {
+func (s *AuthService) Login(ctx context.Context, user models.User) (string, string, error) {
 	log := s.log.Func("Login")
 
 	u, err := s.repo.GetGyUserEmail(ctx, user.Email)
 	if err != nil {
 		log.Error(ctx, action.Login, "error in getting user email", "email", user.Email, "error", err)
-		return "", err
+		return "", "", err
 	}
 
 	ok, err := hash.VerifyPassword(u.Password, user.Password)
 	if err != nil {
 		log.Error(ctx, action.Login, "error verifying password", "userID", u.ID, "error", err)
-		return "", err
+		return "", "", err
 	}
 	if !ok {
 		log.Warn(ctx, action.Login, "incorrect password")
-		return "", types.ErrIncorrectPassword
+		return "", "", types.ErrIncorrectPassword
 	}
 
 	claims := models.Claims{
@@ -67,10 +67,10 @@ func (s *AuthService) Login(ctx context.Context, user models.User) (string, erro
 	tokenString, err := token.SignedString([]byte(s.secretKey))
 	if err != nil {
 		log.Error(ctx, action.Login, "error generating JWT token", "error", err)
-		return "", err
+		return "", "", err
 	}
 
-	return tokenString, nil
+	return tokenString, u.ID, nil
 }
 
 func (s *AuthService) CreateNewUser(ctx context.Context, user models.User) error {

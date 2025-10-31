@@ -60,7 +60,7 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 			"error parsing request body",
 			"error", err,
 		)
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -70,17 +70,17 @@ func (h *Handle) Registration(w http.ResponseWriter, r *http.Request) {
 			action.Registration, msg,
 			"error", ErrorInValidateLogin,
 		)
-		http.Error(w, msg, http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, msg)
 		return
 	}
 
 	err := h.svc.CreateNewUser(ctx, req)
 	if err != nil {
 		if errors.Is(err, types.ErrUserAlreadyExists) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			writeJSON(w, http.StatusConflict, types.ErrUserAlreadyExists)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 		return
 	}
 
@@ -102,8 +102,7 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 			"error reading body",
 			"error", err,
 		)
-
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if len(body) == 0 {
@@ -113,7 +112,7 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 			"empty request body",
 		)
 
-		http.Error(w, "empty request body", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, "empty request body")
 		return
 	}
 
@@ -125,19 +124,19 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 			"invalid JSON",
 			"error", err,
 		)
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
-	token, err := h.svc.Login(ctx, user)
+	token, id, err := h.svc.Login(ctx, user)
 	if err != nil {
 		switch {
 		case errors.Is(err, types.ErrUserNotFound):
-			http.Error(w, err.Error(), http.StatusNotFound)
+			writeJSON(w, http.StatusNotFound, types.ErrUserNotFound)
 		case errors.Is(err, types.ErrIncorrectPassword):
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			writeJSON(w, http.StatusBadRequest, types.ErrIncorrectPassword)
 		default:
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			writeJSON(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 		}
 		return
 	}
@@ -153,7 +152,10 @@ func (h *Handle) Login(w http.ResponseWriter, r *http.Request) {
 	})
 
 	log.Info(ctx, action.Login, "user successfully logged in")
-	writeJSON(w, http.StatusOK, map[string]string{"message": "login successful"})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "login successful",
+		"user_id": id,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

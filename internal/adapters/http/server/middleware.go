@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	"net/http"
+	"time"
+
 	"ride-hail/internal/core/domain/action"
 	"ride-hail/pkg/logger"
-	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func (a *API) middleware(next http.Handler) http.Handler {
@@ -29,7 +31,6 @@ func (a *API) jwtMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log := a.log.Func("api.jwtMiddleware")
 
-		// Получение cookie
 		cookie, err := r.Cookie("Authorization")
 		if err != nil {
 			if errors.Is(err, http.ErrNoCookie) {
@@ -49,14 +50,12 @@ func (a *API) jwtMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Парсинг JWT токена
 		t, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 			if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return []byte(a.cfg.JWT.Secret), nil
 		})
-
 		if err != nil {
 			log.Warn(r.Context(), action.Authorization, "failed to parse token", "error", err)
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -69,7 +68,6 @@ func (a *API) jwtMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Извлечение claims
 		claims, ok := t.Claims.(jwt.MapClaims)
 		if !ok {
 			log.Warn(r.Context(), action.Authorization, "invalid claims type")
@@ -77,7 +75,6 @@ func (a *API) jwtMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Валидация user_id и role
 		userID, okID := claims["user_id"].(string)
 		role, okRole := claims["role"].(string)
 
@@ -96,8 +93,8 @@ func (a *API) jwtMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Обогащение контекста
 		ctx := logger.WithUserID(r.Context(), userID)
+		ctx = logger.WithToken(ctx, token)
 		ctx = logger.WithRole(ctx, role)
 
 		log.Debug(r.Context(), action.Authorization, "user authorized",

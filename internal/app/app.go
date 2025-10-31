@@ -9,7 +9,7 @@ import (
 )
 
 type Service interface {
-	Run()
+	Run(ctx context.Context)
 	Stop(ctx context.Context) error
 }
 
@@ -27,8 +27,8 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	}, nil
 }
 
-func (app *App) Start() {
-	app.svc.Run()
+func (app *App) Start(ctx context.Context) {
+	app.svc.Run(ctx)
 }
 
 func initService(ctx context.Context, cfg config.Config) (Service, error) {

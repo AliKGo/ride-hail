@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"ride-hail/internal/adapters/http/handle/dto"
+	"ride-hail/internal/adapters/http/websocket"
 	"ride-hail/internal/core/domain/action"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
@@ -17,7 +18,7 @@ type RideHandle struct {
 	log *logger.Logger
 }
 
-func NewRideHandle(svc ports.RideService, log *logger.Logger) *RideHandle {
+func NewRideHandle(svc ports.RideService, wsm websocket.PassengerWSHandler, log *logger.Logger) *RideHandle {
 	return &RideHandle{
 		svc: svc,
 		log: log,
@@ -37,25 +38,25 @@ func (h *RideHandle) CreateNewRide(w http.ResponseWriter, r *http.Request) {
 
 	if logger.GetRole(ctx) != types.RoleCustomer {
 		log.Error(ctx, action.CreateRide, "invalid role", "role", logger.GetRole(ctx))
-		http.Error(w, msgForbidden, http.StatusForbidden)
+		writeJSON(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 		return
 	}
 	var rideDto models.CreateRideRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&rideDto); err != nil {
 		log.Error(ctx, "decode error", "msg", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if ok, err := dto.ValidateRideDTO(rideDto); !ok {
 		log.Warn(ctx, action.CreateRide, "invalid request")
-		http.Error(w, err, http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, err)
 		return
 	}
 
 	if resp, err := h.svc.CreateNewRide(ctx, rideDto); err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 		return
 	} else {
 		log.Debug(ctx, action.CreateRide, "the request to create a trip was successfully completed")
@@ -71,7 +72,7 @@ func (h *RideHandle) CancelRide(w http.ResponseWriter, r *http.Request) {
 	log.Debug(ctx, action.CloseRide, "a request to close the ride has been launched")
 	if logger.GetRole(ctx) != types.RoleCustomer {
 		log.Error(ctx, action.CloseRide, "invalid role")
-		http.Error(w, msgForbidden, http.StatusForbidden)
+		writeJSON(w, http.StatusForbidden, http.StatusText(http.StatusForbidden))
 		return
 	}
 
@@ -81,12 +82,12 @@ func (h *RideHandle) CancelRide(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&closeReq); err != nil {
 		log.Error(ctx, action.CloseRide, "error decoding body", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if resp, err := h.svc.CloseRide(ctx, closeReq); err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 		return
 	} else {
 		log.Debug(ctx, action.CloseRide, "the request to cancel the ride has been completed")

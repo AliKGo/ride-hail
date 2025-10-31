@@ -5,7 +5,6 @@ var (
 	Login            = "login"
 	StartApplication = "start application"
 	StopApplication  = "stop application"
-	RequestInit      = "request init"
 )
 
 var (
@@ -13,6 +12,11 @@ var (
 )
 
 var (
-	CreateRide = "create ride"
-	CloseRide  = "close ride"
+	ServiceRide = "parsing data in message broker"
+	CreateRide  = "create ride"
+	CloseRide   = "close ride"
+)
+
+var (
+	WSPassenger = "ws passenger"
 )

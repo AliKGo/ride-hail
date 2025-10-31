@@ -56,3 +56,37 @@ type CloseRideResponse struct {
 	CancelledAt time.Time `json:"cancelled_at"`
 	Message     string    `json:"message"`
 }
+
+type RideRequestRideType struct {
+	RideID              string   `json:"ride_id"`
+	RideNumber          string   `json:"ride_number"`
+	PickupLocation      Location `json:"pickup_location"`
+	DestinationLocation Location `json:"destination_location"`
+	RideType            string   `json:"ride_type"`
+	EstimatedFare       float64  `json:"estimated_fare"`
+	MaxDistanceKm       float64  `json:"max_distance_km"`
+	TimeoutSeconds      int      `json:"timeout_seconds"`
+	CorrelationID       string   `json:"correlation_id"`
+}
+
+type Location struct {
+	Lat     float64 `json:"lat"`
+	Lng     float64 `json:"lng"`
+	Address string  `json:"address"`
+}
+
+type RideStatusUpdate struct {
+	RideID        string    `json:"ride_id"`
+	Status        string    `json:"status"`
+	Timestamp     time.Time `json:"timestamp"`
+	DriverID      string    `json:"driver_id"`
+	CorrelationID string    `json:"correlation_id"`
+}
+
+type RideStatusEvent struct {
+	RideID        string    `json:"ride_id"`
+	Status        string    `json:"status"`
+	Timestamp     time.Time `json:"timestamp"`
+	DriverID      string    `json:"driver_id"`
+	CorrelationID string    `json:"correlation_id"`
+}

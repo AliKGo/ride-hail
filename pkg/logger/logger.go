@@ -17,6 +17,7 @@ type contextKey string
 const (
 	RequestIDKey contextKey = "request_id"
 	UserIDKey    contextKey = "user_id"
+	TokenKey     contextKey = "token"
 	RoleKey      contextKey = "role"
 )
 
@@ -28,7 +29,7 @@ type Logger struct {
 }
 
 // NewLogger создаёт новый логгер с опциями
-func NewLogger(service string, opts LoggerOptions) *Logger {
+func NewLogger(service string, opts Options) *Logger {
 	if opts.Output == nil {
 		opts.Output = os.Stdout
 	}
@@ -54,13 +55,12 @@ func NewLogger(service string, opts LoggerOptions) *Logger {
 	}
 }
 
-type LoggerOptions struct {
+type Options struct {
 	Output io.Writer
 	Pretty bool
 	Level  slog.Level
 }
 
-// Func создаёт логгер функции
 func (l *Logger) Func(prefix string) *FuncLogger {
 	return &FuncLogger{
 		service:  l.service,
@@ -70,7 +70,6 @@ func (l *Logger) Func(prefix string) *FuncLogger {
 	}
 }
 
-// FuncLogger — логгер уровня функции
 type FuncLogger struct {
 	service  string
 	prefix   string
@@ -80,12 +79,11 @@ type FuncLogger struct {
 
 func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message string, fields ...interface{}) {
 	if len(fields)%2 != 0 {
-		// Логируем предупреждение о нечётном количестве аргументов
 		f.slog.Warn("odd number of fields provided to logger",
 			slog.String("func", f.prefix),
 			slog.Int("fields_count", len(fields)),
 		)
-		fields = fields[:len(fields)-1] // Удаляем последний элемент
+		fields = fields[:len(fields)-1]
 	}
 
 	reqID := GetRequestID(ctx)
@@ -106,7 +104,6 @@ func (f *FuncLogger) log(ctx context.Context, level slog.Level, action, message 
 		attrs = append(attrs, slog.String("user_id", userID))
 	}
 
-	// Безопасная итерация по полям
 	for i := 0; i < len(fields); i += 2 {
 		key, ok := fields[i].(string)
 		if !ok {
@@ -134,7 +131,6 @@ func (f *FuncLogger) Error(ctx context.Context, action, message string, fields .
 	f.log(ctx, slog.LevelError, action, message, fields...)
 }
 
-// Функции для работы с контекстом
 func WithRequestID(ctx context.Context, requestID string) context.Context {
 	return context.WithValue(ctx, RequestIDKey, requestID)
 }
@@ -143,6 +139,19 @@ func GetRequestID(ctx context.Context) string {
 	if v := ctx.Value(RequestIDKey); v != nil {
 		if id, ok := v.(string); ok {
 			return id
+		}
+	}
+	return ""
+}
+
+func WithToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, TokenKey, token)
+}
+
+func GetToken(ctx context.Context) string {
+	if v := ctx.Value(TokenKey); v != nil {
+		if token, ok := v.(string); ok {
+			return token
 		}
 	}
 	return ""

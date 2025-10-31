@@ -7,6 +7,7 @@ import (
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/internal/core/domain/types"
 	"ride-hail/pkg/executor"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -106,9 +107,92 @@ func (repo *RideRepository) GenerateRideNumber(ctx context.Context) (int, error)
         SET counter = ride_counters.counter + 1
         RETURNING counter
     `).Scan(&counter)
-	
+
 	if err != nil {
 		return 0, err
 	}
 	return counter, nil
+}
+
+func (repo *RideRepository) UpdateRide(ctx context.Context, rideID string, newStatus string, reason string, t *time.Time) error {
+	ex := executor.GetExecutor(ctx, repo.pool)
+
+	var timeField string
+	switch newStatus {
+	case types.RideStatusMATCHED:
+		timeField = "matched_at"
+	case types.RideStatusEN_ROUTE:
+		timeField = "arrived_at"
+	case types.RideStatusARRIVED:
+		timeField = "arrived_at"
+	case types.RideStatusIN_PROGRESS:
+		timeField = "started_at"
+	case types.RideStatusCOMPLETED:
+		timeField = "completed_at"
+	case types.RideStatusCANCELLED:
+		timeField = "cancelled_at"
+	}
+
+	var query string
+	var args []any
+
+	if timeField != "" {
+		if newStatus == types.RideStatusCANCELLED {
+			query = fmt.Sprintf(`
+				UPDATE rides
+				SET 
+					status = $1,
+					%s = COALESCE(%s, $2),
+					cancellation_reason = CASE WHEN $3 != '' THEN $3 ELSE cancellation_reason END,
+					updated_at = now()
+				WHERE id = $4
+			`, timeField, timeField)
+			args = []any{newStatus, t, reason, rideID}
+		} else {
+			query = fmt.Sprintf(`
+				UPDATE rides
+				SET 
+					status = $1,
+					%s = COALESCE(%s, $2),
+					updated_at = now()
+				WHERE id = $3
+			`, timeField, timeField)
+			args = []any{newStatus, t, rideID}
+		}
+	} else {
+		query = `
+			UPDATE rides
+			SET 
+				status = $1,
+				updated_at = now()
+			WHERE id = $2
+		`
+		args = []any{newStatus, rideID}
+	}
+
+	_, err := ex.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update ride status: %w", err)
+	}
+
+	return nil
+}
+
+func (r *RideRepository) UpdateMatchedRide(ctx context.Context, rideID, driverID string, matchedAt time.Time) error {
+	ex := executor.GetExecutor(ctx, r.pool)
+
+	query := `
+UPDATE rides
+SET driver_id = $1,
+    matched_at = $2,
+    updated_at = now()
+WHERE id = $3
+`
+
+	_, err := ex.Exec(ctx, query, driverID, matchedAt, rideID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
