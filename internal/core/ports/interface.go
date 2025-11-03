@@ -26,8 +26,7 @@ type UserRepository interface {
 // ride ports
 
 type PassengerWSManager interface {
-	SendRideStatusUpdate(ctx context.Context, passengerID string, update models.RideStatusUpdate) error
-	SendDriverLocationUpdate(ctx context.Context, passengerID string, update models.DriverLocationUpdate) error
+	SendRide(ctx context.Context, passengerID string, data []byte) error
 }
 
 type RideService interface {

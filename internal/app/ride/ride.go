@@ -18,22 +18,22 @@ import (
 )
 
 type RideService struct {
-	server     server.Server
-	svc        ports.RideService
-	wsm        *websocket.PassengerWebSocketManager
-	cancelFunc context.CancelFunc
-	cancel     context.Context
+	server server.Server
+	svc    ports.RideService
+	wsm    *websocket.PassengerWebSocketManager
+	cancel context.CancelFunc
+	ctx    context.Context
 }
 
 func New(ctx context.Context, log *logger.Logger, cfg config.Config) (*RideService, error) {
-	pg, err := pg.New(ctx, cfg.Database)
+	p, err := pg.New(ctx, cfg.Database)
 	if err != nil {
 		return nil, err
 	}
 
-	uRepo := postgres.NewRepo(pg.Pool)
-	cRepo := postgres.NewCordRepository(pg.Pool)
-	rRepo := postgres.NewRideRepository(pg.Pool)
+	uRepo := postgres.NewRepo(p.Pool)
+	cRepo := postgres.NewCordRepository(p.Pool)
+	rRepo := postgres.NewRideRepository(p.Pool)
 
 	rb, err := rabbit.New(cfg.RabbitMQ)
 	if err != nil {
@@ -49,9 +49,9 @@ func New(ctx context.Context, log *logger.Logger, cfg config.Config) (*RideServi
 	dmCons := rabbit2.NewDriverResponseConsumer(rb.Conn)
 	rSCons := rabbit2.NewRideStatusConsumer(rb.Conn)
 
-	tmx := txm.NewTXManager(pg.Pool)
+	tmx := txm.NewTXManager(p.Pool)
 
-	wsm := websocket.NewPassengerWebSocketManager(log)
+	wsm := websocket.NewPassengerWebSocketManager(ctx, log)
 	wsh := websocket.NewPassengerWebSocketHandler(wsm, log)
 
 	authServ := service.NewAuthService(cfg, uRepo, log)
@@ -65,24 +65,24 @@ func New(ctx context.Context, log *logger.Logger, cfg config.Config) (*RideServi
 		return nil, err
 	}
 
-	cancel, cancelFunc := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	return &RideService{
-		server:     serv,
-		svc:        rideServ,
-		wsm:        wsm,
-		cancel:     cancel,
-		cancelFunc: cancelFunc,
+		server: serv,
+		svc:    rideServ,
+		wsm:    wsm,
+		ctx:    ctx,
+		cancel: cancel,
 	}, nil
 }
 
-func (r *RideService) Run(ctx context.Context) {
-	go r.svc.StartService(r.cancel)
+func (r *RideService) Run() {
+	go r.svc.StartService(r.ctx)
 	go r.server.Run()
 }
 
 func (r *RideService) Stop(ctx context.Context) error {
-	r.cancelFunc()
+	r.cancel()
 
 	r.wsm.Shutdown()
 

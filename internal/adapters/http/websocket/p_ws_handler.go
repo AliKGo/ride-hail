@@ -30,7 +30,7 @@ func (ph *PassengerWebSocketHandler) PassengerWebSocketHandler(w http.ResponseWr
 
 	passengerId := getRideID(r)
 
-	if passengerId == "" {
+	if passengerId == "" || passengerId == logger.GetUserID(ctx) {
 		log.Error(ctx, action.WSPassenger, "invalid id")
 		writeJSON(w, http.StatusBadRequest, "invalid ride_id")
 		return

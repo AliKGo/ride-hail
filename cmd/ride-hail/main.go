@@ -22,12 +22,11 @@ func Run() {
 	}
 
 	ctx := context.Background()
-	app, err := app.New(ctx, *cfg)
+	application, err := app.New(ctx, *cfg)
 	if err != nil {
 		slog.Error("error in creating app", err)
-		//cansel()
 		return
 	}
-	app.Start(ctx)
+	application.Start(ctx)
 
 }

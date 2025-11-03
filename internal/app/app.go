@@ -17,7 +17,7 @@ import (
 )
 
 type Service interface {
-	Run(ctx context.Context)
+	Run()
 	Stop(ctx context.Context) error
 }
 
@@ -55,7 +55,7 @@ func (app *App) Start(ctx context.Context) {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	log.Info(ctx, action.StartApplication, "starting service")
-	go app.svc.Run(ctx)
+	go app.svc.Run()
 
 	sig := <-sigChan
 	log.Warn(ctx, action.StopApplication, "received shutdown signal", "signal", sig.String())
@@ -91,5 +91,7 @@ func initService(ctx context.Context, log *logger.Logger, cfg config.Config) (Se
 		funcLog.Error(ctx, action.StartApplication, "unsupported service mode", "mode", cfg.Mode, "error", err)
 		return nil, err
 	}
+
+	funcLog.Error(ctx, action.StopApplication, "service initialization failed", "mode", cfg.Mode)
 	return nil, nil
 }

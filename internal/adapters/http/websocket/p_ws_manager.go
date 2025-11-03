@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"ride-hail/internal/core/domain/action"
-	"ride-hail/internal/core/domain/models"
 	"ride-hail/pkg/logger"
 	"sync"
 	"time"
@@ -38,8 +37,8 @@ type PassengerWSMessage struct {
 	Data  interface{} `json:"data,omitempty"`
 }
 
-func NewPassengerWebSocketManager(log *logger.Logger) *PassengerWebSocketManager {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewPassengerWebSocketManager(ctx context.Context, log *logger.Logger) *PassengerWebSocketManager {
+	ctx, cancel := context.WithCancel(ctx)
 	return &PassengerWebSocketManager{
 		connections: make(map[string]*Passenger),
 		log:         log,
@@ -94,7 +93,7 @@ func (m *PassengerWebSocketManager) readPump(ctx context.Context, p *Passenger) 
 		m.wg.Done()
 	}()
 
-	log := m.log.Func("readPump")
+	log := m.log.Func("PassengerWebSocketManager.readPump")
 	p.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	p.conn.SetPongHandler(func(string) error {
 		p.lastPing = time.Now()
@@ -135,7 +134,7 @@ func (m *PassengerWebSocketManager) writePump(ctx context.Context, p *Passenger)
 		m.wg.Done()
 	}()
 
-	log := m.log.Func("writePump")
+	log := m.log.Func("PassengerWebSocketManager.writePump")
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -150,7 +149,7 @@ func (m *PassengerWebSocketManager) writePump(ctx context.Context, p *Passenger)
 				return
 			}
 			p.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := p.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+			if err := p.conn.WriteJSON(msg); err != nil {
 				log.Error(ctx, action.WSPassenger, "write error", "error", err)
 				return
 			}
@@ -229,7 +228,7 @@ func (m *PassengerWebSocketManager) marshalMessage(msg interface{}) []byte {
 	return data
 }
 
-func (m *PassengerWebSocketManager) SendRideStatusUpdate(ctx context.Context, passengerID string, update models.RideStatusUpdate) error {
+func (m *PassengerWebSocketManager) SendRide(ctx context.Context, passengerID string, data []byte) error {
 	m.mu.RLock()
 	conn, exists := m.connections[passengerID]
 	m.mu.RUnlock()
@@ -238,39 +237,10 @@ func (m *PassengerWebSocketManager) SendRideStatusUpdate(ctx context.Context, pa
 		return fmt.Errorf("passenger %s not connected", passengerID)
 	}
 
-	messageBytes, err := json.Marshal(update)
-	if err != nil {
-		return fmt.Errorf("failed to marshal status update: %w", err)
-	}
-
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("timeout sending message to passenger %s", passengerID)
-	case conn.send <- messageBytes:
-		return nil
-	case <-time.After(5 * time.Second):
-		return fmt.Errorf("timeout sending message to passenger %s", passengerID)
-	}
-}
-
-func (m *PassengerWebSocketManager) SendDriverLocationUpdate(ctx context.Context, passengerID string, update models.DriverLocationUpdate) error {
-	m.mu.RLock()
-	conn, exists := m.connections[passengerID]
-	m.mu.RUnlock()
-
-	if !exists || !conn.authenticated {
-		return fmt.Errorf("passenger %s not connected", passengerID)
-	}
-
-	messageBytes, err := json.Marshal(update)
-	if err != nil {
-		return fmt.Errorf("failed to marshal location update: %w", err)
-	}
-
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("timeout sending message to passenger %s", passengerID)
-	case conn.send <- messageBytes:
+	case conn.send <- data:
 		return nil
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("timeout sending message to passenger %s", passengerID)

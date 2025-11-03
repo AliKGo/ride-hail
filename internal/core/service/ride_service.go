@@ -123,13 +123,17 @@ func (svc *RideService) parsingRideStatus(ctx context.Context, msg models.RideSt
 		log.Error(ctxNew, action.ServiceRide, "failed to update ride in database", "error", err)
 		return
 	}
-	if err := svc.wsm.SendRideStatusUpdate(ctxNew, msg.RideID, models.RideStatusUpdate{
+
+	if data, err := json.Marshal(models.RideStatusUpdate{
 		RideID:        msg.RideID,
 		Status:        msg.Status,
 		Timestamp:     msg.Timestamp,
 		DriverID:      msg.DriverID,
 		CorrelationID: msg.CorrelationID,
 	}); err != nil {
+		log.Error(ctxNew, action.ServiceRide, "failed to marshal ride status", "error", err)
+		return
+	} else if err = svc.wsm.SendRide(ctxNew, msg.RideID, data); err != nil {
 		log.Error(ctxNew, action.ServiceRide, "failed to send ride status update", "error", err)
 		return
 	}
@@ -175,13 +179,16 @@ func (svc *RideService) parsingDriverMatch(ctx context.Context, driverResp model
 		return
 	}
 
-	if err = svc.wsm.SendRideStatusUpdate(ctx, ride.ID, models.RideStatusUpdate{
+	if data, err := json.Marshal(models.RideStatusUpdate{
 		RideID:        driverResp.RideID,
 		Status:        types.RideStatusMATCHED,
 		Timestamp:     now,
 		DriverID:      driverResp.DriverID,
 		CorrelationID: driverResp.CorrelationID,
 	}); err != nil {
+		log.Error(ctxNew, action.ServiceRide, "failed to marshal ride status", "error", err)
+		return
+	} else if err = svc.wsm.SendRide(ctx, ride.ID, data); err != nil {
 		log.Error(ctxNew, action.ServiceRide, "failed to send ride-status update")
 		return
 	}
@@ -221,7 +228,10 @@ func (svc *RideService) processingMsg(ctx context.Context, msg models.DriverLoca
 		return
 	}
 
-	if err = svc.wsm.SendDriverLocationUpdate(ctx, ride.PassengerID, msg); err != nil {
+	if data, err := json.Marshal(msg); err != nil {
+		log.Error(ctx, action.ServiceRide, "failed to marshal driver location", "error", err)
+		return
+	} else if err = svc.wsm.SendRide(ctx, ride.PassengerID, data); err != nil {
 		log.Error(ctx, action.ServiceRide, "failed to send driver location update", "error", err)
 		return
 	}
