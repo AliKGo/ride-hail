@@ -20,3 +20,7 @@ var (
 var (
 	WSPassenger = "ws passenger"
 )
+
+var (
+	UpdateStatus = "updating status"
+)

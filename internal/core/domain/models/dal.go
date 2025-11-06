@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type DriverLocationUpdate struct {
 	DriverID  string         `json:"driver_id"`
@@ -36,4 +38,38 @@ type DriverResponseEvent struct {
 		} `json:"vehicle"`
 	} `json:"driver_info"`
 	CorrelationID string `json:"correlation_id"`
+}
+
+type Driver struct {
+	ID            string       `json:"id"`
+	CreatedAt     time.Time    `json:"creation_time"`
+	UpdatedAt     time.Time    `json:"update_time"`
+	LicenseNumber string       `json:"license_number"`
+	VehicleType   string       `json:"vehicle_type"`
+	VehicleAttrs  VehicleAttrs `json:"vehicle_attrs"`
+	Rating        float64      `json:"rating"`
+	TotalRides    int          `json:"total_rides"`
+	TotalEarnings float64      `json:"total_earnings"`
+	Status        string       `json:"status"`
+	IsVarified    bool         `json:"is_varified"`
+}
+type VehicleAttrs struct {
+	LicensePlate      string `json:"license_plate"`
+	InspectionDate    string `json:"inspection_date"`
+	Make              string `json:"make"`
+	Model             string `json:"model"`
+	Year              int    `json:"year"`
+	Color             string `json:"color"`
+	Seats             int    `json:"seats"`
+	InsuranceExpiry   string `json:"insurance_expiry"`
+	TaxiLicenseExpiry string `json:"taxi_license_expiry"`
+}
+
+type DriverSession struct {
+	ID            string    `json:"id"`
+	DriverID      string    `json:"driver_id"`
+	StartedAt     time.Time `json:"started_at"`
+	EndedAt       time.Time `json:"ended_at"`
+	TotalRides    int       `json:"total_rides"`
+	TotalEarnings float64   `json:"total_earnings"`
 }

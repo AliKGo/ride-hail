@@ -9,3 +9,10 @@ var (
 )
 
 var ErrRideNotFound = errors.New("ride not found")
+
+var (
+	ErrInternalServiceError = errors.New("internal service error")
+	ErrDriverExists         = errors.New("driver already exists")
+	ErrDriverNotFound       = errors.New("driver not found")
+	ErrDriverOnline         = errors.New("driver is online")
+)

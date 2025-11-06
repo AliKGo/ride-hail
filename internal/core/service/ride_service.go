@@ -17,7 +17,7 @@ import (
 
 type RideService struct {
 	log       *logger.Logger
-	repo      Repository
+	repo      rideRepository
 	wsm       ports.PassengerWSManager
 	txm       txm.Manager
 	msgBroker MsgBroker
@@ -30,7 +30,7 @@ type MsgBroker struct {
 	consumerRideStatus  ports.RideStatusSubscriber
 }
 
-type Repository struct {
+type rideRepository struct {
 	ride ports.RideRepository
 	cord ports.CoordinatesRepository
 }
@@ -40,7 +40,7 @@ func NewRideService(log *logger.Logger, txm txm.Manager, rideRepo ports.RideRepo
 		log: log,
 		txm: txm,
 		wsm: wsm,
-		repo: Repository{
+		repo: rideRepository{
 			ride: rideRepo,
 			cord: cordRepo,
 		},

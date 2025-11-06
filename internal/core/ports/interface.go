@@ -65,3 +65,18 @@ type CoordinatesRepository interface {
 	CreateNewCoordinate(ctx context.Context, c models.Coordinate) (string, error)
 	GetCoordinate(ctx context.Context, id string) (models.Coordinate, error)
 }
+
+//dal ports
+
+type DalService interface {
+	CreateNewDriver(ctx context.Context, newDriver models.Driver) error
+	StatusOnline(ctx context.Context, id string, loc models.Position) (string, error)
+}
+
+type DriversRepository interface {
+	Insert(ctx context.Context, driver models.Driver) error
+	Get(ctx context.Context, id string) (models.Driver, error)
+	UpdateStatus(ctx context.Context, id, status string) error
+	InsertSession(ctx context.Context, id string) (string, error)
+	GetLastActiveSession(ctx context.Context, driverID string) (models.DriverSession, error)
+}
