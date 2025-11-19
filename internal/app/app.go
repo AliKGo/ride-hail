@@ -29,7 +29,7 @@ type App struct {
 func New(ctx context.Context, cfg config.Config) (*App, error) {
 	log := logger.NewLogger(
 		cfg.Mode, logger.Options{
-			Pretty: true,
+			Pretty: false,
 			Level:  slog.LevelDebug,
 		},
 	)
