@@ -98,10 +98,45 @@ func (h *DalHandler) DriverGoesOnline(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errMsg)
 		return
 	}
-	h.svc.StatusOnline(ctx, logger.GetUserID(ctx), models.Position{
+
+	sessionID, err := h.svc.StatusOnline(ctx, logger.GetUserID(ctx), models.Position{
 		Latitude:  location.Latitude,
 		Longitude: location.Longitude,
 	})
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":  "AVAILABLE",
+		"session": sessionID,
+		"message": "You are now online and ready to accept rides"},
+	)
+}
+
+func (h *DalHandler) DriverGoesOffline(w http.ResponseWriter, r *http.Request) {
+	log := h.log.Func("DalHandler.DriverGoesOffline")
+	ctx := r.Context()
+	if logger.GetRole(ctx) != types.RoleDriver {
+		log.Error(ctx, action.UpdateStatus, "invalid role")
+		writeJSON(w, http.StatusForbidden, "invalid role")
+	}
+
+	if logger.GetUserID(ctx) != extractDriverID(r) && logger.GetUserID(ctx) != "" {
+		log.Error(ctx, action.UpdateStatus, "invalid driver_id")
+		writeJSON(w, http.StatusBadRequest, "invalid driver_id")
+		return
+	}
+
+	if driverInfo, err := h.svc.StatusClose(ctx, logger.GetUserID(ctx)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+		return
+	} else {
+		writeJSON(w, http.StatusOK, driverInfo)
+		return
+	}
 }
 
 func extractDriverID(r *http.Request) string {

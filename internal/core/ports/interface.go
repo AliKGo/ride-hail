@@ -71,6 +71,7 @@ type CoordinatesRepository interface {
 type DalService interface {
 	CreateNewDriver(ctx context.Context, newDriver models.Driver) error
 	StatusOnline(ctx context.Context, id string, loc models.Position) (string, error)
+	StatusClose(ctx context.Context, id string) (*models.DriverInfoClosed, error)
 }
 
 type DriversRepository interface {
@@ -78,5 +79,6 @@ type DriversRepository interface {
 	Get(ctx context.Context, id string) (models.Driver, error)
 	UpdateStatus(ctx context.Context, id, status string) error
 	InsertSession(ctx context.Context, id string) (string, error)
+	CloseSession(ctx context.Context, id string) error
 	GetLastActiveSession(ctx context.Context, driverID string) (models.DriverSession, error)
 }

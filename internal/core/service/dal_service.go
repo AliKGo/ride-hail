@@ -105,11 +105,70 @@ func (svc *DalService) StatusOnline(ctx context.Context, id string, loc models.P
 			log.Error(ctx, action.UpdateStatus, "error when saving data in the database", err)
 			return types.ErrInternalServiceError
 		}
+		if err := svc.repo.driver.UpdateStatus(ctx, driver.ID, types.DriverStatusAvailable); err != nil {
+			log.Error(ctx, action.UpdateStatus, "error when saving data in the database", err)
+			return types.ErrInternalServiceError
+		}
 		return nil
 	}
 
-	svc.txm.Do(ctx, fn)
+	if err = svc.txm.Do(ctx, fn); err != nil {
+		return "", types.ErrInternalServiceError
+	}
+
 	return sessionId, nil
+}
+
+func (svc *DalService) StatusClose(ctx context.Context, id string) (*models.DriverInfoClosed, error) {
+	log := svc.log.Func("DalService.StatusClose")
+	driver, err := svc.repo.driver.Get(ctx, id)
+
+	if err != nil {
+		log.Error(ctx, action.UpdateStatus, "error when getting data from the database", err)
+		return nil, types.ErrInternalServiceError
+	}
+
+	if driver.Status != types.DriverStatusAvailable {
+		log.Warn(ctx, action.UpdateStatus, "driver is not available")
+		return nil, types.ErrDriverStatusNotAllow
+	}
+
+	driverSession, err := svc.repo.driver.GetLastActiveSession(ctx, driver.ID)
+	if err != nil {
+		log.Error(ctx, action.UpdateStatus, "error when getting last active session", err)
+		return nil, types.ErrInternalServiceError
+	} else if !driverSession.EndedAt.IsZero() {
+		log.Warn(ctx, action.UpdateStatus, "the driver session has not ended")
+		return nil, types.ErrDriverStatusNotAllow
+	}
+
+	fn := func(ctx context.Context) error {
+		if err := svc.repo.driver.CloseSession(ctx, driverSession.ID); err != nil {
+			log.Error(ctx, action.UpdateStatus, "error when closing session", err)
+			return err
+		}
+
+		if err := svc.repo.driver.UpdateStatus(ctx, driver.ID, types.DriverStatusOffline); err != nil {
+			log.Error(ctx, action.UpdateStatus, "error when saving data in the database", err)
+			return err
+		}
+		return nil
+	}
+
+	if err = svc.txm.Do(ctx, fn); err != nil {
+		return nil, types.ErrInternalServiceError
+	}
+
+	return &models.DriverInfoClosed{
+		Status:    types.DriverStatusOffline,
+		SessionID: driverSession.ID,
+		SessionSummary: models.SessionSummary{
+			DurationHours:  time.Since(driverSession.StartedAt).Hours(),
+			RidesCompleted: driverSession.TotalRides,
+			Earnings:       driverSession.TotalEarnings,
+		},
+		Message: "You are now offline",
+	}, nil
 }
 
 func isInspectionExpired(inspectionDate time.Time) bool {

@@ -73,3 +73,16 @@ type DriverSession struct {
 	TotalRides    int       `json:"total_rides"`
 	TotalEarnings float64   `json:"total_earnings"`
 }
+
+type SessionSummary struct {
+	DurationHours  float64 `json:"duration_hours"`
+	RidesCompleted int     `json:"rides_completed"`
+	Earnings       float64 `json:"earnings"`
+}
+
+type DriverInfoClosed struct {
+	Status         string         `json:"status"`
+	SessionID      string         `json:"session_id"`
+	SessionSummary SessionSummary `json:"session_summary"`
+	Message        string         `json:"message"`
+}

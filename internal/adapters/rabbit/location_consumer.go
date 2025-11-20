@@ -3,9 +3,10 @@ package rabbit
 import (
 	"context"
 	"encoding/json"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"ride-hail/internal/core/domain/models"
 	"ride-hail/pkg/rabbit"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type LocationConsumer struct {

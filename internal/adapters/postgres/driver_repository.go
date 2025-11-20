@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ride-hail/internal/core/domain/models"
+	"ride-hail/pkg/executor"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"ride-hail/internal/core/domain/models"
-	"ride-hail/pkg/executor"
 )
 
 type DriverRepository struct {
@@ -64,7 +65,7 @@ func (r *DriverRepository) Get(ctx context.Context, id string) (models.Driver, e
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return models.Driver{}rrorf("driver not found: %w", err)
+			return models.Driver{}, fmt.Errorf("driver not found: %w", err)
 		}
 		return models.Driver{}, fmt.Errorf("failed to get driver: %w", err)
 	}
@@ -150,4 +151,25 @@ func (r *DriverRepository) GetLastActiveSession(ctx context.Context, driverID st
 	}
 
 	return session, nil
+}
+
+func (r *DriverRepository) CloseSession(ctx context.Context, id string) error {
+	ex := executor.GetExecutor(ctx, r.pool)
+
+	query := `
+		UPDATE driver_sessions
+		SET ended_at = NOW()
+		WHERE id = $1 AND ended_at IS NULL
+	`
+
+	cmdTag, err := ex.Exec(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Errorf("session %s not found or already closed", id)
+	}
+
+	return nil
 }

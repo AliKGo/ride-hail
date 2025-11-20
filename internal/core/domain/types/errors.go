@@ -15,4 +15,5 @@ var (
 	ErrDriverExists         = errors.New("driver already exists")
 	ErrDriverNotFound       = errors.New("driver not found")
 	ErrDriverOnline         = errors.New("driver is online")
+	ErrDriverStatusNotAllow = errors.New("the status of the driver does not allow")
 )
